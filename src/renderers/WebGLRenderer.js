@@ -1,4 +1,5 @@
 import {
+	REVISION,
 	BackSide,
 	DoubleSide,
 	FrontSide,
@@ -109,7 +110,6 @@ function WebGLRenderer( parameters = {} ) {
 
 	// physically based shading
 
-	this.gammaFactor = 2.0;	// for backwards compatibility
 	this.outputEncoding = LinearEncoding;
 
 	// physical lights
@@ -215,8 +215,10 @@ function WebGLRenderer( parameters = {} ) {
 			failIfMajorPerformanceCaveat: _failIfMajorPerformanceCaveat
 		};
 
-		// event listeners must be registered before WebGL context is created, see #12753
+		// OffscreenCanvas does not have setAttribute, see #22811
+		if ( 'setAttribute' in _canvas ) _canvas.setAttribute( 'data-engine', `three.js r${REVISION}` );
 
+		// event listeners must be registered before WebGL context is created, see #12753
 		_canvas.addEventListener( 'webglcontextlost', onContextLost, false );
 		_canvas.addEventListener( 'webglcontextrestored', onContextRestore, false );
 
@@ -302,7 +304,7 @@ function WebGLRenderer( parameters = {} ) {
 		clipping = new WebGLClipping( properties );
 		programCache = new WebGLPrograms( _this, cubemaps, cubeuvmaps, extensions, capabilities, bindingStates, clipping );
 		materials = new WebGLMaterials( properties );
-		renderLists = new WebGLRenderLists( properties );
+		renderLists = new WebGLRenderLists();
 		renderStates = new WebGLRenderStates( extensions, capabilities );
 		background = new WebGLBackground( _this, cubemaps, state, objects, _premultipliedAlpha );
 		shadowMap = new WebGLShadowMap( _this, objects, capabilities );
@@ -570,6 +572,7 @@ function WebGLRenderer( parameters = {} ) {
 		cubeuvmaps.dispose();
 		objects.dispose();
 		bindingStates.dispose();
+		programCache.dispose();
 
 		xr.dispose();
 
@@ -653,6 +656,12 @@ function WebGLRenderer( parameters = {} ) {
 				programCache.releaseProgram( program );
 
 			} );
+
+			if ( material.isShaderMaterial ) {
+
+				programCache.releaseShaderCache( material );
+
+			}
 
 		}
 
@@ -849,188 +858,6 @@ function WebGLRenderer( parameters = {} ) {
 
 		renderStateStack.pop();
 		currentRenderState = null;
-
-	};
-
-	// compileAsync
-
-	this.compileAsync = function ( scene, targetScene = null ) {
-		// If no explicit targetScene was given use the scene instead
-		if ( ! targetScene ) {
-
-			targetScene = scene;
-
-		}
-
-		currentRenderState = renderStates.get( targetScene );
-		currentRenderState.init();
-
-		renderStateStack.push( currentRenderState );
-
-		let foundScene = scene === targetScene;
-
-		// Gather lights from both the scene and the new object that will be added
-		// to the scene.
-		targetScene.traverseVisible( function ( object ) {
-
-			if ( object === scene ) {
-
-				foundScene = true;
-
-			}
-
-			if ( object.isLight ) {
-
-				currentRenderState.pushLight( object );
-
-				if ( object.castShadow ) {
-
-					currentRenderState.pushShadow( object );
-
-				}
-
-			}
-
-		} );
-
-		// If the scene wasn't already part of the targetScene, add any lights it
-		// contains as well.
-		if ( ! foundScene ) {
-
-			scene.traverseVisible( function ( object ) {
-
-				if ( object.isLight ) {
-
-					currentRenderState.pushLight( object );
-
-					if ( object.castShadow ) {
-
-						currentRenderState.pushShadow( object );
-
-					}
-
-				}
-
-			} );
-
-		}
-
-		currentRenderState.setupLights( _this.physicallyCorrectLights );
-
-		const compiling = new Set();
-
-		// Only initialize materials in the new scene, not the targetScene.
-
-    function getProgramSide(material, scene, object) {
-      if (material.transparent === true && material.side === DoubleSide) {
-				material.side = BackSide;
-				// material.needsUpdate = true;
-				getProgram(material, scene, object);
-				material.side = FrontSide;
-				// material.needsUpdate = true;
-				getProgram(material, scene, object);
-				material.side = DoubleSide;
-			} else {
-				getProgram(material, scene, object);
-			}
-		}
-    function _compileMaterial( material, object ) {
-		  if ( Array.isArray( material ) ) {
-
-				for ( let i = 0; i < material.length; i ++ ) {
-
-					const material2 = material[ i ];
-
-					getProgramSide( material2, targetScene, object );
-					compiling.add( material2 );
-
-				}
-
-			} else {
-
-				getProgramSide( material, targetScene, object );
-				compiling.add( material );
-
-			}
-		}
-
-		if (scene.overrideMaterial) {
-			scene.traverse( function ( object ) {
-				const material = object.material;
-
-				if ( material ) {
-					_compileMaterial(scene.overrideMaterial, object);
-				}
-			});
-		} else {
-			scene.traverse( function ( object ) {
-
-				const material = object.material;
-
-				if ( material ) {
-
-					_compileMaterial(material, object);
-
-				}
-
-			} );
-		}
-
-		currentRenderState = null;
-
-		// Wait for all the materials in the new object to indicate that they're
-		// ready to be used before resolving the promise.
-
-		return new Promise( ( resolve ) => {
-
-			function checkMaterialsReady() {
-
-				compiling.forEach( function ( material ) {
-
-					const materialProperties = properties.get( material );
-					const program = materialProperties.currentProgram;
-
-					if ( program.isReady() ) {
-
-						// remove any programs that report they're ready to use from the list
-						compiling.delete( material );
-
-					}
-
-				} );
-
-				// once the list of compiling materials is empty, call the callback
-
-				if ( compiling.size === 0 ) {
-
-					resolve( scene );
-					return;
-
-				}
-
-				// if some materials are still not ready, wait a bit and check again
-
-				setTimeout( checkMaterialsReady, 10 );
-
-			}
-
-			if ( extensions.get( 'KHR_parallel_shader_compile' ) !== null ) {
-
-				// If we can check the compilation status of the materials without
-				// blocking then do so right away.
-
-				checkMaterialsReady();
-
-			} else {
-
-				// Otherwise start by waiting a bit to give the materials we just
-				// initialized a chance to finish.
-
-				setTimeout( checkMaterialsReady, 10 );
-
-			}
-
-		} );
 
 	};
 
@@ -1374,7 +1201,8 @@ function WebGLRenderer( parameters = {} ) {
 				minFilter: LinearMipmapLinearFilter,
 				magFilter: NearestFilter,
 				wrapS: ClampToEdgeWrapping,
-				wrapT: ClampToEdgeWrapping
+				wrapT: ClampToEdgeWrapping,
+				useRenderToTexture: extensions.has( 'WEBGL_multisampled_render_to_texture' )
 			} );
 
 		}
@@ -1557,23 +1385,13 @@ function WebGLRenderer( parameters = {} ) {
 
 		}
 
+		const progUniforms = program.getUniforms();
+		const uniformsList = WebGLUniforms.seqWithValue( progUniforms.seq, uniforms );
+
 		materialProperties.currentProgram = program;
-		materialProperties.uniformsList = null;
+		materialProperties.uniformsList = uniformsList;
 
 		return program;
-
-	}
-
-	function getUniformList( materialProperties ) {
-
-		if ( materialProperties.uniformsList === null ) {
-
-			const progUniforms = materialProperties.currentProgram.getUniforms();
-			materialProperties.uniformsList = WebGLUniforms.seqWithValue( progUniforms.seq, materialProperties.uniforms );
-
-		}
-
-		return materialProperties.uniformsList;
 
 	}
 
@@ -1591,6 +1409,7 @@ function WebGLRenderer( parameters = {} ) {
 		materialProperties.numIntersection = parameters.numClipIntersection;
 		materialProperties.vertexAlphas = parameters.vertexAlphas;
 		materialProperties.vertexTangents = parameters.vertexTangents;
+		materialProperties.toneMapping = parameters.toneMapping;
 
 	}
 
@@ -1609,6 +1428,7 @@ function WebGLRenderer( parameters = {} ) {
 		const morphTargets = !! geometry.morphAttributes.position;
 		const morphNormals = !! geometry.morphAttributes.normal;
 		const morphTargetsCount = !! geometry.morphAttributes.position ? geometry.morphAttributes.position.length : 0;
+		const toneMapping = material.toneMapped ? _this.toneMapping : NoToneMapping;
 
 		const materialProperties = properties.get( material );
 		const lights = currentRenderState.state.lights;
@@ -1687,6 +1507,10 @@ function WebGLRenderer( parameters = {} ) {
 				needsProgramChange = true;
 
 			} else if ( materialProperties.morphNormals !== morphNormals ) {
+
+				needsProgramChange = true;
+
+			} else if ( materialProperties.toneMapping !== toneMapping ) {
 
 				needsProgramChange = true;
 
@@ -1879,13 +1703,13 @@ function WebGLRenderer( parameters = {} ) {
 
 			materials.refreshMaterialUniforms( m_uniforms, material, _pixelRatio, _height, _transmissionRenderTarget );
 
-			WebGLUniforms.upload( _gl, getUniformList( materialProperties ), m_uniforms, textures );
+			WebGLUniforms.upload( _gl, materialProperties.uniformsList, m_uniforms, textures );
 
 		}
 
 		if ( material.isShaderMaterial && material.uniformsNeedUpdate === true ) {
 
-			WebGLUniforms.upload( _gl, getUniformList( materialProperties ), m_uniforms, textures );
+			WebGLUniforms.upload( _gl, materialProperties.uniformsList, m_uniforms, textures );
 			material.uniformsNeedUpdate = false;
 
 		}
@@ -1950,15 +1774,71 @@ function WebGLRenderer( parameters = {} ) {
 
 	};
 
+	this.setRenderTargetTextures = function ( renderTarget, colorTexture, depthTexture ) {
+
+		properties.get( renderTarget.texture ).__webglTexture = colorTexture;
+		properties.get( renderTarget.depthTexture ).__webglTexture = depthTexture;
+
+		const renderTargetProperties = properties.get( renderTarget );
+		renderTargetProperties.__hasExternalTextures = true;
+
+		if ( renderTargetProperties.__hasExternalTextures ) {
+
+			renderTargetProperties.__autoAllocateDepthBuffer = depthTexture === undefined;
+
+			if ( ! renderTargetProperties.__autoAllocateDepthBuffer ) {
+
+				// The multisample_render_to_texture extension doesn't work properly if there
+				// are midframe flushes and an external depth buffer. Disable use of the extension.
+				if ( renderTarget.useRenderToTexture ) {
+
+					console.warn( 'render-to-texture extension was disabled because an external texture was provided' );
+					renderTarget.useRenderToTexture = false;
+					renderTarget.useRenderbuffer = true;
+
+				}
+
+			}
+
+		}
+
+	};
+
+	this.setRenderTargetFramebuffer = function ( renderTarget, defaultFramebuffer ) {
+
+		const renderTargetProperties = properties.get( renderTarget );
+		renderTargetProperties.__webglFramebuffer = defaultFramebuffer;
+		renderTargetProperties.__useDefaultFramebuffer = defaultFramebuffer === undefined;
+
+	};
+
 	this.setRenderTarget = function ( renderTarget, activeCubeFace = 0, activeMipmapLevel = 0 ) {
 
 		_currentRenderTarget = renderTarget;
 		_currentActiveCubeFace = activeCubeFace;
 		_currentActiveMipmapLevel = activeMipmapLevel;
+		let useDefaultFramebuffer = true;
 
-		if ( renderTarget && properties.get( renderTarget ).__webglFramebuffer === undefined ) {
+		if ( renderTarget ) {
 
-			textures.setupRenderTarget( renderTarget );
+			const renderTargetProperties = properties.get( renderTarget );
+
+			if ( renderTargetProperties.__useDefaultFramebuffer !== undefined ) {
+
+				// We need to make sure to rebind the framebuffer.
+				state.bindFramebuffer( _gl.FRAMEBUFFER, null );
+				useDefaultFramebuffer = false;
+
+			} else if ( renderTargetProperties.__webglFramebuffer === undefined ) {
+
+				textures.setupRenderTarget( renderTarget );
+
+			} else if ( renderTargetProperties.__hasExternalTextures ) {
+
+				// Color and depth texture must be rebound in order for the swapchain to update.
+				textures.rebindTextures( renderTarget, properties.get( renderTarget.texture ).__webglTexture, properties.get( renderTarget.depthTexture ).__webglTexture );
+
+			}
 
 		}
 
@@ -1983,7 +1863,7 @@ function WebGLRenderer( parameters = {} ) {
 				framebuffer = __webglFramebuffer[ activeCubeFace ];
 				isCube = true;
 
-			} else if ( renderTarget.isWebGLMultisampleRenderTarget ) {
+			} else if ( renderTarget.useRenderbuffer ) {
 
 				framebuffer = properties.get( renderTarget ).__webglMultisampledFramebuffer;
 
@@ -2007,7 +1887,7 @@ function WebGLRenderer( parameters = {} ) {
 
 		const framebufferBound = state.bindFramebuffer( _gl.FRAMEBUFFER, framebuffer );
 
-		if ( framebufferBound && capabilities.drawBuffers ) {
+		if ( framebufferBound && capabilities.drawBuffers && useDefaultFramebuffer ) {
 
 			let needsUpdate = false;
 
@@ -2170,25 +2050,20 @@ function WebGLRenderer( parameters = {} ) {
 
 	this.copyFramebufferToTexture = function ( position, texture, level = 0 ) {
 
+		if ( texture.isFramebufferTexture !== true ) {
+
+			console.error( 'THREE.WebGLRenderer: copyFramebufferToTexture() can only be used with FramebufferTexture.' );
+			return;
+
+		}
+
 		const levelScale = Math.pow( 2, - level );
 		const width = Math.floor( texture.image.width * levelScale );
 		const height = Math.floor( texture.image.height * levelScale );
 
-		let glFormat = utils.convert( texture.format );
-
-		if ( capabilities.isWebGL2 ) {
-
-			// Workaround for https://bugs.chromium.org/p/chromium/issues/detail?id=1120100
-			// Not needed in Chrome 93+
-
-			if ( glFormat === _gl.RGB ) glFormat = _gl.RGB8;
-			if ( glFormat === _gl.RGBA ) glFormat = _gl.RGBA8;
-
-		}
-
 		textures.setTexture2D( texture, 0 );
 
-		_gl.copyTexImage2D( _gl.TEXTURE_2D, level, glFormat, position.x, position.y, width, height, 0 );
+		_gl.copyTexSubImage2D( _gl.TEXTURE_2D, level, 0, 0, position.x, position.y, width, height );
 
 		state.unbindTexture();
 
@@ -2338,7 +2213,7 @@ function WebGLRenderer( parameters = {} ) {
 
 	if ( typeof __THREE_DEVTOOLS__ !== 'undefined' ) {
 
-		__THREE_DEVTOOLS__.dispatchEvent( new CustomEvent( 'observe', { detail: this } ) ); // eslint-disable-line no-undef
+		__THREE_DEVTOOLS__.dispatchEvent( new CustomEvent( 'observe', { detail: this } ) );
 
 	}
 
