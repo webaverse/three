@@ -861,6 +861,188 @@ function WebGLRenderer( parameters = {} ) {
 
 	};
 
+	// compileAsync
+
+	this.compileAsync = function ( scene, targetScene = null ) {
+		// If no explicit targetScene was given use the scene instead
+		if ( ! targetScene ) {
+
+			targetScene = scene;
+
+		}
+
+		currentRenderState = renderStates.get( targetScene );
+		currentRenderState.init();
+
+		renderStateStack.push( currentRenderState );
+
+		let foundScene = scene === targetScene;
+
+		// Gather lights from both the scene and the new object that will be added
+		// to the scene.
+		targetScene.traverseVisible( function ( object ) {
+
+			if ( object === scene ) {
+
+				foundScene = true;
+
+			}
+
+			if ( object.isLight ) {
+
+				currentRenderState.pushLight( object );
+
+				if ( object.castShadow ) {
+
+					currentRenderState.pushShadow( object );
+
+				}
+
+			}
+
+		} );
+
+		// If the scene wasn't already part of the targetScene, add any lights it
+		// contains as well.
+		if ( ! foundScene ) {
+
+			scene.traverseVisible( function ( object ) {
+
+				if ( object.isLight ) {
+
+					currentRenderState.pushLight( object );
+
+					if ( object.castShadow ) {
+
+						currentRenderState.pushShadow( object );
+
+					}
+
+				}
+
+			} );
+
+		}
+
+		currentRenderState.setupLights( _this.physicallyCorrectLights );
+
+		const compiling = new Set();
+
+		// Only initialize materials in the new scene, not the targetScene.
+
+    function getProgramSide(material, scene, object) {
+      if (material.transparent === true && material.side === DoubleSide) {
+				material.side = BackSide;
+				// material.needsUpdate = true;
+				getProgram(material, scene, object);
+				material.side = FrontSide;
+				// material.needsUpdate = true;
+				getProgram(material, scene, object);
+				material.side = DoubleSide;
+			} else {
+				getProgram(material, scene, object);
+			}
+		}
+    function _compileMaterial( material, object ) {
+		  if ( Array.isArray( material ) ) {
+
+				for ( let i = 0; i < material.length; i ++ ) {
+
+					const material2 = material[ i ];
+
+					getProgramSide( material2, targetScene, object );
+					compiling.add( material2 );
+
+				}
+
+			} else {
+
+				getProgramSide( material, targetScene, object );
+				compiling.add( material );
+
+			}
+		}
+
+		if (scene.overrideMaterial) {
+			scene.traverse( function ( object ) {
+				const material = object.material;
+
+				if ( material ) {
+					_compileMaterial(scene.overrideMaterial, object);
+				}
+			});
+		} else {
+			scene.traverse( function ( object ) {
+
+				const material = object.material;
+
+				if ( material ) {
+
+					_compileMaterial(material, object);
+
+				}
+
+			} );
+		}
+
+		currentRenderState = null;
+
+		// Wait for all the materials in the new object to indicate that they're
+		// ready to be used before resolving the promise.
+
+		return new Promise( ( resolve ) => {
+
+			function checkMaterialsReady() {
+
+				compiling.forEach( function ( material ) {
+
+					const materialProperties = properties.get( material );
+					const program = materialProperties.currentProgram;
+
+					if ( program.isReady() ) {
+
+						// remove any programs that report they're ready to use from the list
+						compiling.delete( material );
+
+					}
+
+				} );
+
+				// once the list of compiling materials is empty, call the callback
+
+				if ( compiling.size === 0 ) {
+
+					resolve( scene );
+					return;
+
+				}
+
+				// if some materials are still not ready, wait a bit and check again
+
+				setTimeout( checkMaterialsReady, 10 );
+
+			}
+
+			if ( extensions.get( 'KHR_parallel_shader_compile' ) !== null ) {
+
+				// If we can check the compilation status of the materials without
+				// blocking then do so right away.
+
+				checkMaterialsReady();
+
+			} else {
+
+				// Otherwise start by waiting a bit to give the materials we just
+				// initialized a chance to finish.
+
+				setTimeout( checkMaterialsReady, 10 );
+
+			}
+
+		} );
+
+	};
+
 	// Animation Loop
 
 	let onAnimationFrameCallback = null;
@@ -1385,13 +1567,23 @@ function WebGLRenderer( parameters = {} ) {
 
 		}
 
-		const progUniforms = program.getUniforms();
-		const uniformsList = WebGLUniforms.seqWithValue( progUniforms.seq, uniforms );
-
 		materialProperties.currentProgram = program;
-		materialProperties.uniformsList = uniformsList;
+		materialProperties.uniformsList = null;
 
 		return program;
+
+	}
+
+	function getUniformList( materialProperties ) {
+
+		if ( materialProperties.uniformsList === null ) {
+
+			const progUniforms = materialProperties.currentProgram.getUniforms();
+			materialProperties.uniformsList = WebGLUniforms.seqWithValue( progUniforms.seq, materialProperties.uniforms );
+
+		}
+
+		return materialProperties.uniformsList;
 
 	}
 
@@ -1703,13 +1895,13 @@ function WebGLRenderer( parameters = {} ) {
 
 			materials.refreshMaterialUniforms( m_uniforms, material, _pixelRatio, _height, _transmissionRenderTarget );
 
-			WebGLUniforms.upload( _gl, materialProperties.uniformsList, m_uniforms, textures );
+			WebGLUniforms.upload( _gl, getUniformList( materialProperties ), m_uniforms, textures );
 
 		}
 
 		if ( material.isShaderMaterial && material.uniformsNeedUpdate === true ) {
 
-			WebGLUniforms.upload( _gl, materialProperties.uniformsList, m_uniforms, textures );
+			WebGLUniforms.upload( _gl, getUniformList( materialProperties ), m_uniforms, textures );
 			material.uniformsNeedUpdate = false;
 
 		}
