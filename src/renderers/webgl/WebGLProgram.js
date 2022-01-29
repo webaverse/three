@@ -839,7 +839,7 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 		if ( cachedUniforms === undefined ) {
 
 			// Populates cachedUniforms and cachedAttributes
-			onFirstUse();
+			onFirstUse.call(this);
 
 		}
 
@@ -856,7 +856,7 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 		if ( cachedAttributes === undefined ) {
 
 			// Populates cachedAttributes and cachedUniforms
-			onFirstUse();
+			onFirstUse.call(this);
 
 		}
 
