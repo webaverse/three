@@ -28075,6 +28075,10 @@ function WebGLRenderer( parameters = {} ) {
 
 	};
 
+	this.getWebGLAttributes = function () {
+		return attributes;
+	};
+
 	if ( typeof __THREE_DEVTOOLS__ !== 'undefined' ) {
 
 		__THREE_DEVTOOLS__.dispatchEvent( new CustomEvent( 'observe', { detail: this } ) );
