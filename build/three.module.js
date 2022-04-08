@@ -7925,6 +7925,22 @@ class Material extends EventDispatcher {
 
 	}
 
+	programCacheKey(parameters) {
+		return '';
+	}
+
+	freeze(freezeFn = parameters => {
+		// this implementation ensures that the typical vertex shader parameters are keyed in the cache
+		return [
+			'freeze',
+			this.uuid,
+			parameters.maxBones,
+			parameters.morphTargetsCount,
+		].join(',');
+	}) {
+		this.programCacheKey = freezeFn;
+	}
+
 	setValues( values ) {
 
 		if ( values === undefined ) return;
@@ -19166,15 +19182,22 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			rendererExtensionShaderTextureLod: isWebGL2 || extensions.has( 'EXT_shader_texture_lod' ),
 			rendererExtensionParallelShaderCompile: extensions.has( 'KHR_parallel_shader_compile' ),
 
-			customProgramCacheKey: material.customProgramCacheKey()
+			customProgramCacheKey: material.customProgramCacheKey(),
+			programCacheKey: '',
 
 		};
+
+		parameters.programCacheKey = material.programCacheKey(parameters);
 
 		return parameters;
 
 	}
 
 	function getProgramCacheKey( parameters ) {
+
+		if (parameters.programCacheKey) {
+			return parameters.programCacheKey;
+		}
 
 		const array = [];
 
