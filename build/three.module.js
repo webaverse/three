@@ -19195,6 +19195,10 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 
 	function getProgramCacheKey( parameters ) {
 
+		if (parameters.programCacheKey) {
+			return parameters.programCacheKey;
+		}
+
 		const array = [];
 
 		if ( parameters.shaderID ) {
