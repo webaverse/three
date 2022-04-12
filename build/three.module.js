@@ -27272,6 +27272,16 @@ function WebGLRenderer( parameters = {} ) {
 
 	}
 
+	this.getProgramCacheKey = (object, material) => {
+		const scene = new Scene();
+		const lights = new WebGLLights();
+		const shadowsArray = [];
+
+		const parameters = programCache.getParameters( material, lights.state, shadowsArray, scene, object );
+		const programCacheKey = programCache.getProgramCacheKey( parameters );
+		return programCacheKey;
+	};
+
 	function getUniformList( materialProperties ) {
 
 		if ( materialProperties.uniformsList === null ) {
