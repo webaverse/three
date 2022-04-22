@@ -19147,9 +19147,9 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			numRectAreaLights: lights.rectArea.length,
 			numHemiLights: lights.hemi.length,
 
-			numDirLightShadows: lights.directionalShadowMap.length,
-			numPointLightShadows: lights.pointShadowMap.length,
-			numSpotLightShadows: lights.spotShadowMap.length,
+			numDirLightShadows: object.receiveShadow ? lights.directionalShadowMap.length : 0,
+			numPointLightShadows: object.receiveShadow ? lights.pointShadowMap.length : 0,
+			numSpotLightShadows: object.receiveShadow ? lights.spotShadowMap.length : 0,
 
 			numClippingPlanes: clipping.numPlanes,
 			numClipIntersection: clipping.numIntersection,
@@ -19157,7 +19157,7 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			format: material.format,
 			dithering: material.dithering,
 
-			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0,
+			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0 && object.receiveShadow,
 			shadowMapType: renderer.shadowMap.type,
 
 			toneMapping: material.toneMapped ? renderer.toneMapping : NoToneMapping,
