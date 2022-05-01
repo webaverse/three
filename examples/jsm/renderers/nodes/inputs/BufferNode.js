@@ -1,4 +1,7 @@
 import InputNode from '../core/InputNode.js';
+import ExpressionNode from '../core/ExpressionNode.js';
+import UVNode from '../accessors/UVNode.js';
+import ColorSpaceNode from '../display/ColorSpaceNode.js';
 
 class BufferNode extends InputNode {
 
@@ -12,7 +15,7 @@ class BufferNode extends InputNode {
 
 	}
 
-	getNodeType( /* builder */ ) {
+	getNodeType( builder ) {
 
 		return this.bufferType;
 

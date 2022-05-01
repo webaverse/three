@@ -27,7 +27,7 @@ class OperatorNode extends TempNode {
 
 	}
 
-	getNodeType( builder, output ) {
+	getNodeType( builder ) {
 
 		const op = this.op;
 
@@ -45,15 +45,9 @@ class OperatorNode extends TempNode {
 
 			return typeA;
 
-		} else if ( op === '==' || op === '&&' ) {
+		} else if ( op === '==' || op === '>' || op === '&&' ) {
 
 			return 'bool';
-
-		} else if ( op === '<=' || op === '>' ) {
-
-			const length = builder.getTypeLength( output );
-
-			return length > 1 ? `bvec${ length }` : 'bool';
 
 		} else {
 
@@ -94,7 +88,7 @@ class OperatorNode extends TempNode {
 		const aNode = this.aNode;
 		const bNode = this.bNode;
 
-		const type = this.getNodeType( builder, output );
+		const type = this.getNodeType( builder );
 
 		let typeA = null;
 		let typeB = null;
@@ -137,8 +131,6 @@ class OperatorNode extends TempNode {
 		const a = aNode.build( builder, typeA );
 		const b = bNode.build( builder, typeB );
 
-		const outputLength = builder.getTypeLength( output );
-
 		if ( output !== 'void' ) {
 
 			if ( op === '=' ) {
@@ -146,14 +138,6 @@ class OperatorNode extends TempNode {
 				builder.addFlowCode( `${a} ${this.op} ${b}` );
 
 				return a;
-
-			} else if ( op === '>' && outputLength > 1 ) {
-
-				return `${ builder.getMethod( 'greaterThan' ) }( ${a}, ${b} )`;
-
-			} else if ( op === '<=' && outputLength > 1 ) {
-
-				return `${ builder.getMethod( 'lessThanEqual' ) }( ${a}, ${b} )`;
 
 			} else {
 
