@@ -10,7 +10,7 @@ class TempNode extends Node {
 
 	build( builder, output ) {
 
-		const type = builder.getVectorType( this.getNodeType( builder, output ) );
+		const type = builder.getVectorType( this.getNodeType( builder ) );
 
 		if ( builder.context.temp !== false && type !== 'void ' && output !== 'void' ) {
 

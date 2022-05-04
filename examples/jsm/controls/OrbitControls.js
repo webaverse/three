@@ -581,6 +581,12 @@ class OrbitControls extends EventDispatcher {
 
 		}
 
+		function handleMouseUp( /*event*/ ) {
+
+			// no-op
+
+		}
+
 		function handleMouseWheel( event ) {
 
 			if ( event.deltaY < 0 ) {
@@ -787,6 +793,12 @@ class OrbitControls extends EventDispatcher {
 
 		}
 
+		function handleTouchEnd( /*event*/ ) {
+
+			// no-op
+
+		}
+
 		//
 		// event handlers - FSM: listen for events and reset state
 		//
@@ -838,20 +850,30 @@ class OrbitControls extends EventDispatcher {
 
 		function onPointerUp( event ) {
 
-		    removePointer( event );
+			if ( scope.enabled === false ) return;
 
-		    if ( pointers.length === 0 ) {
+			if ( event.pointerType === 'touch' ) {
 
-		        scope.domElement.releasePointerCapture( event.pointerId );
+				onTouchEnd();
 
-		        scope.domElement.removeEventListener( 'pointermove', onPointerMove );
-		        scope.domElement.removeEventListener( 'pointerup', onPointerUp );
+			} else {
 
-		    }
+				onMouseUp( event );
 
-		    scope.dispatchEvent( _endEvent );
+			}
 
-		    state = STATE.NONE;
+			removePointer( event );
+
+			//
+
+			if ( pointers.length === 0 ) {
+
+				scope.domElement.releasePointerCapture( event.pointerId );
+
+				scope.domElement.removeEventListener( 'pointermove', onPointerMove );
+				scope.domElement.removeEventListener( 'pointerup', onPointerUp );
+
+			}
 
 		}
 
@@ -989,6 +1011,16 @@ class OrbitControls extends EventDispatcher {
 					break;
 
 			}
+
+		}
+
+		function onMouseUp( event ) {
+
+			handleMouseUp( event );
+
+			scope.dispatchEvent( _endEvent );
+
+			state = STATE.NONE;
 
 		}
 
@@ -1149,6 +1181,16 @@ class OrbitControls extends EventDispatcher {
 					state = STATE.NONE;
 
 			}
+
+		}
+
+		function onTouchEnd( event ) {
+
+			handleTouchEnd( event );
+
+			scope.dispatchEvent( _endEvent );
+
+			state = STATE.NONE;
 
 		}
 
