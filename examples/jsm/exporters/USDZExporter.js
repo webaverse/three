@@ -17,35 +17,27 @@ class USDZExporter {
 
 		scene.traverseVisible( ( object ) => {
 
-			if ( object.isMesh ) {
+			if ( object.isMesh && object.material.isMeshStandardMaterial ) {
 
-				if ( object.material.isMeshStandardMaterial ) {
+				const geometry = object.geometry;
+				const material = object.material;
 
-					const geometry = object.geometry;
-					const material = object.material;
+				const geometryFileName = 'geometries/Geometry_' + geometry.id + '.usd';
 
-					const geometryFileName = 'geometries/Geometry_' + geometry.id + '.usd';
+				if ( ! ( geometryFileName in files ) ) {
 
-					if ( ! ( geometryFileName in files ) ) {
-
-						const meshObject = buildMeshObject( geometry );
-						files[ geometryFileName ] = buildUSDFileAsString( meshObject );
-
-					}
-
-					if ( ! ( material.uuid in materials ) ) {
-
-						materials[ material.uuid ] = material;
-
-					}
-
-					output += buildXform( object, geometry, material );
-
-				} else {
-
-					console.warn( 'THREE.USDZExporter: Unsupported material type (USDZ only supports MeshStandardMaterial)', object );
+					const meshObject = buildMeshObject( geometry );
+					files[ geometryFileName ] = buildUSDFileAsString( meshObject );
 
 				}
+
+				if ( ! ( material.uuid in materials ) ) {
+
+					materials[ material.uuid ] = material;
+
+				}
+
+				output += buildXform( object, geometry, material );
 
 			}
 
