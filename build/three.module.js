@@ -14486,11 +14486,37 @@ function WebGLBufferRenderer( gl, extensions, info, capabilities ) {
 
 	}
 
+	// @TODO: Rename
+	function renderMultiDraw( starts, counts, drawCount ) {
+
+		const extension = extensions.get( 'WEBGL_multi_draw' );
+
+		// @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsWEBGL( mode, counts, 0, type, starts, 0, drawCount );
+
+		// @TODO: info.update()
+
+	}
+	function renderMultiDrawInstances( starts, counts, instances, drawCount ) {
+
+		const extension = extensions.get( 'WEBGL_multi_draw' );
+
+		// @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsInstancedWEBGL( mode, counts, 0, type, starts, 0, instances, 0, drawCount );
+
+		// @TODO: info.update()
+
+	}
+
 	//
 
 	this.setMode = setMode;
 	this.render = render;
 	this.renderInstances = renderInstances;
+	this.renderMultiDraw = renderMultiDraw;
+	this.renderMultiDrawInstances = renderMultiDrawInstances;
 
 }
 
@@ -16371,12 +16397,38 @@ function WebGLIndexedBufferRenderer( gl, extensions, info, capabilities ) {
 
 	}
 
+	// @TODO: Rename
+	function renderMultiDraw( starts, counts, drawCount ) {
+
+		const extension = extensions.get( 'WEBGL_multi_draw' );
+
+		// @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsWEBGL( mode, counts, 0, type, starts, 0, drawCount );
+
+		// @TODO: info.update()
+
+	}
+	function renderMultiDrawInstances( starts, counts, instances, drawCount ) {
+
+		const extension = extensions.get( 'WEBGL_multi_draw' );
+
+		// @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsInstancedWEBGL( mode, counts, 0, type, starts, 0, instances, 0, drawCount );
+
+		// @TODO: info.update()
+
+	}
+
 	//
 
 	this.setMode = setMode;
 	this.setIndex = setIndex;
 	this.render = render;
 	this.renderInstances = renderInstances;
+	this.renderMultiDraw = renderMultiDraw;
+	this.renderMultiDrawInstances = renderMultiDrawInstances;
 
 }
 
@@ -18572,6 +18624,7 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 		versionString = '#version 300 es\n';
 
 		prefixVertex = [
+			parameters.rendererExtensionMultiDraw ? '#extension GL_ANGLE_multi_draw : require' : '',
 			'precision mediump sampler2DArray;',
 			'#define attribute in',
 			'#define varying out',
@@ -19180,6 +19233,7 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			rendererExtensionFragDepth: isWebGL2 || extensions.has( 'EXT_frag_depth' ),
 			rendererExtensionDrawBuffers: isWebGL2 || extensions.has( 'WEBGL_draw_buffers' ),
 			rendererExtensionShaderTextureLod: isWebGL2 || extensions.has( 'EXT_shader_texture_lod' ),
+			rendererExtensionMultiDraw: object.isBatchedMesh && extensions.has( 'WEBGL_multi_draw' ),
 			rendererExtensionParallelShaderCompile: extensions.has( 'KHR_parallel_shader_compile' ),
 
 			customProgramCacheKey: material.customProgramCacheKey(),
@@ -25868,6 +25922,12 @@ function WebGLRenderer( parameters = {} ) {
 
 	let _transmissionRenderTarget = null;
 
+	// Multi draw
+
+	const multiDrawStarts = [];
+	const multiDrawCounts = [];
+	const multiDrawInstanceCounts = [];
+
 	// camera matrices cache
 
 	const _projScreenMatrix = new Matrix4();
@@ -26483,7 +26543,27 @@ function WebGLRenderer( parameters = {} ) {
 
 		}
 
-		if ( object.isInstancedMesh ) {
+		if ( object.isBatchedMesh ) {
+
+			// @TODO: Instancing Batched mesh support
+
+			object.getDrawSpec( multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts );
+
+			if ( multiDrawStarts.length > 0 ) {
+
+				if (object.isInstancedMesh) {
+
+					renderer.renderMultiDrawInstances( multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts, multiDrawStarts.length );
+				
+					} else {
+
+						renderer.renderMultiDraw( multiDrawStarts, multiDrawCounts, multiDrawStarts.length );
+				
+					}
+
+			}
+
+		} else if ( object.isInstancedMesh ) {
 
 			renderer.renderInstances( drawStart, drawCount, object.count );
 
@@ -26975,6 +27055,32 @@ function WebGLRenderer( parameters = {} ) {
 
 					const geometry = objects.update( object );
 					const material = object.material;
+
+					if ( material.visible ) {
+
+						currentRenderList.push( object, geometry, material, groupOrder, _vector3.z, null );
+
+					}
+
+				}
+
+			} else if ( object.isBatchedMesh ) {
+
+				// object.resetCullingStatus();
+
+				if ( ! object.frustumCulled || object.intersectsFrustum( _frustum ) ) {
+
+					if ( sortObjects ) {
+
+						_vector3.setFromMatrixPosition( object.matrixWorld )
+							.applyMatrix4( _projScreenMatrix );
+
+					}
+
+					const geometry = objects.update( object );
+					const material = object.material;
+
+					// @TODO: Support multi materials?
 
 					if ( material.visible ) {
 
