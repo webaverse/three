@@ -27068,6 +27068,19 @@ function WebGLRenderer( parameters = {} ) {
 
 				// object.resetCullingStatus();
 
+				if ( object.isSkinnedMesh ) {
+
+					// update skeleton only once in a frame
+
+					if ( object.skeleton.frame !== info.render.frame ) {
+
+						object.skeleton.update();
+						object.skeleton.frame = info.render.frame;
+
+					}
+
+				}
+				
 				if ( ! object.frustumCulled || object.intersectsFrustum( _frustum ) ) {
 
 					if ( sortObjects ) {
