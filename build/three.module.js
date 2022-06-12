@@ -26547,7 +26547,7 @@ function WebGLRenderer( parameters = {} ) {
 
 			// @TODO: Instancing Batched mesh support
 
-			object.getDrawSpec( multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts );
+			object.getDrawSpec( camera, multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts );
 
 			if ( multiDrawStarts.length > 0 ) {
 
