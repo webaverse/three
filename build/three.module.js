@@ -28219,6 +28219,69 @@ function WebGLRenderer( parameters = {} ) {
 
 	};
 
+	function clientWaitAsync(sync, flags = 0, interval_ms = 10) {
+		return new Promise((resolve, reject) => {
+				let check = () => {
+						const res = _gl.clientWaitSync(sync, flags, 0);
+						if (res == _gl.WAIT_FAILED) {
+							reject();
+							return;
+						}
+						if (res == _gl.TIMEOUT_EXPIRED) {
+							setTimeout(check, interval_ms);
+							return;
+						}
+						resolve();
+				};
+	
+				check();
+		});
+	}
+	function readPixelsAsync(x, y, w, h, format, type, texture, outputBuffer) {
+		// latch old fb
+		const oldFb = _gl.getParameter(_gl.FRAMEBUFFER_BINDING);
+		const tempFb = _gl.createFramebuffer();
+		{
+			// make this the current frame buffer
+			_gl.bindFramebuffer(_gl.FRAMEBUFFER, tempFb);
+	
+			// attach the texture to the framebuffer.
+			_gl.framebufferTexture2D(_gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, texture, 0);
+		}
+	
+		// read pixels
+		const buf = _gl.createBuffer();
+		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
+		_gl.bufferData(_gl.PIXEL_PACK_BUFFER, outputBuffer.byteLength, _gl.STREAM_READ);
+		_gl.readPixels(x, y, w, h, format, type, 0);
+		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
+	
+		const sync = _gl.fenceSync(_gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+		if (!sync) {
+				return Promise.resolve(null);
+		}
+	
+		// restore old fb and dispose of the temporary fb
+		_gl.bindFramebuffer(_gl.FRAMEBUFFER, oldFb);
+		_gl.deleteFramebuffer(tempFb);
+	
+		// flush
+		_gl.flush();
+	
+		// wait for results
+		return clientWaitAsync(sync, 0, 10).then(() => {
+				_gl.deleteSync(sync);
+	
+				_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
+				_gl.getBufferSubData(_gl.PIXEL_PACK_BUFFER, 0, outputBuffer);
+				_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
+				_gl.deleteBuffer(buf);
+	
+				return outputBuffer;
+		});
+	}
+	this.readPixelsAsync = readPixelsAsync;
+
 	this.initTexture = function ( texture ) {
 
 		textures.setTexture2D( texture, 0 );
