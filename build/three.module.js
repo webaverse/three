@@ -26085,6 +26085,9 @@ function WebGLRenderer( parameters = {} ) {
 		_this.state = state;
 		_this.info = info;
 
+		_this.attributes = attributes;
+		_this.textures = textures;
+
 	}
 
 	initGLContext();
