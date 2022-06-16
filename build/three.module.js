@@ -23794,6 +23794,7 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	this.safeSetTexture2D = safeSetTexture2D;
 	this.safeSetTextureCube = safeSetTextureCube;
+	this.getTexture = getTexture;
 
 }
 
