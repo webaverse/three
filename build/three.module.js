@@ -23772,6 +23772,10 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	}
 
+	function getTexture(texture) {
+		  return properties.get(texture).__webglTexture;
+	}
+
 	//
 
 	this.allocateTextureUnit = allocateTextureUnit;
