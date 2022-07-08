@@ -84,9 +84,27 @@ var SSRShader = {
 			float distance=(a*x0+b*y0+c*z0+d)/sqrt(a*a+b*b+c*c);
 			return distance;
 		}
-		float getDepth( const in vec2 uv ) {
-			return texture2D( tDepth, uv ).x;
+		float linearize_depth(in float depth){
+			float a = cameraFar / (cameraFar - cameraNear);
+			float b = cameraFar * cameraNear / (cameraNear - cameraFar);
+			return a + b / depth;
 		}
+		
+		float reconstruct_depth(const in vec2 uv){
+			float depth = texture2D(tDepth, uv).x;
+			return pow(2.0, depth * log2(cameraFar + 1.0)) - 1.0;
+		}
+		
+		float getDepth(vec2 uv) {
+			#if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )
+				return linearize_depth(reconstruct_depth(uv));
+			#else
+				return texture2D(tDepth, uv).x;
+			#endif
+		}
+		// float getDepth( const in vec2 uv ) {
+		// 	return texture2D( tDepth, uv ).x;
+		// }
 		float getViewZ( const in float depth ) {
 			#ifdef PERSPECTIVE_CAMERA
 				return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
