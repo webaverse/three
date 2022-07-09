@@ -32,8 +32,9 @@ var SSRShader = {
 		'opacity': { value: .5 },
 		'maxDistance': { value: 180 },
 		'cameraRange': { value: 0 },
-		'thickness': { value: .018 }
-
+		'thickness': { value: .018 },
+		'uTime': { value: 0 },
+		'distortionTexture': { value: null }
 	},
 
 	vertexShader: /* glsl */`
@@ -53,7 +54,11 @@ var SSRShader = {
 	fragmentShader: /* glsl */`
 		// precision highp float;
 		precision highp sampler2D;
+
+		uniform sampler2D distortionTexture;
+
 		varying vec2 vUv;
+		uniform float uTime;
 		uniform sampler2D tDepth;
 		uniform sampler2D tNormal;
 		uniform sampler2D tMetalness;
@@ -130,6 +135,7 @@ var SSRShader = {
 			xy*=resolution;//screen
 			return xy;
 		}
+
 		void main(){
 			#ifdef SELECTIVE
 				float metalness=texture2D(tMetalness,vUv).r;
@@ -237,6 +243,14 @@ var SSRShader = {
 							float fresnelCoe=(dot(viewIncidentDir,viewReflectDir)+1.)/2.;
 							op*=fresnelCoe;
 						#endif
+						vec4 influence = texture2D(distortionTexture, uv);
+						if(influence.r + influence.g + influence.b > 0.3){
+							uv.y += sin(uv.x * 40.0 + (uTime * 2.5))*0.005;
+							uv.x += cos(uv.y * 40.0 + (uTime * 2.5))*0.01;
+							uv.x -= cos(uv.y*5.2+uTime*1.4)/100.0;
+							uv.y -= cos(uv.x*5.2+uTime*1.4)/100.0;
+						}
+
 						vec4 reflectColor=texture2D(tDiffuse,uv);
 						gl_FragColor.xyz=reflectColor.xyz;
 						gl_FragColor.a=op;
