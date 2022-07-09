@@ -16,7 +16,7 @@ import {
 	WebGLRenderTarget,
 	HalfFloatType,
 } from '../../../build/three.module.js';
-import { Pass, FullScreenQuad } from './Pass.js';
+import { Pass, FullScreenQuad } from '../postprocessing/Pass.js';
 import { SSRShader } from '../shaders/SSRShader.js';
 import { SSRBlurShader } from '../shaders/SSRShader.js';
 import { SSRDepthShader } from '../shaders/SSRShader.js';
@@ -92,7 +92,7 @@ class SSRPass extends Pass {
 
 				} else {
 
-					this.ssrMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+					// this.ssrMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
 
 				}
 
@@ -153,20 +153,20 @@ class SSRPass extends Pass {
 			}
 		} );
 
-		// beauty render target with depth buffer
+		// // beauty render target with depth buffer
 
-		const depthTexture = new DepthTexture();
-		depthTexture.type = UnsignedShortType;
-		depthTexture.minFilter = NearestFilter;
-		depthTexture.magFilter = NearestFilter;
+		// const depthTexture = new DepthTexture();
+		// depthTexture.type = UnsignedShortType;
+		// depthTexture.minFilter = NearestFilter;
+		// depthTexture.magFilter = NearestFilter;
 
-		this.beautyRenderTarget = new WebGLRenderTarget( this.width, this.height, {
-			minFilter: NearestFilter,
-			magFilter: NearestFilter,
-			format: RGBAFormat,
-			depthTexture: depthTexture,
-			depthBuffer: true
-		} );
+		// this.beautyRenderTarget = new WebGLRenderTarget( this.width, this.height, {
+		// 	minFilter: NearestFilter,
+		// 	magFilter: NearestFilter,
+		// 	format: RGBAFormat,
+		// 	depthTexture: depthTexture,
+		// 	depthBuffer: true
+		// } );
 
 		//for bouncing
 		this.prevRenderTarget = new WebGLRenderTarget( this.width, this.height, {
@@ -175,13 +175,20 @@ class SSRPass extends Pass {
 			format: RGBAFormat,
 		} );
 
-		// normal render target
+		// normal render target with depth buffer
+
+		const depthTexture = new DepthTexture();
+		depthTexture.type = UnsignedShortType;
+		depthTexture.minFilter = NearestFilter;
+		depthTexture.magFilter = NearestFilter;
 
 		this.normalRenderTarget = new WebGLRenderTarget( this.width, this.height, {
 			minFilter: NearestFilter,
 			magFilter: NearestFilter,
 			format: RGBAFormat,
 			type: HalfFloatType,
+			depthTexture: depthTexture,
+			depthBuffer: true
 		} );
 
 		// metalness render target
@@ -224,12 +231,12 @@ class SSRPass extends Pass {
 			blending: NoBlending
 		} );
 
-		this.ssrMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+		// this.ssrMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
 		this.ssrMaterial.uniforms[ 'tNormal' ].value = this.normalRenderTarget.texture;
 		this.ssrMaterial.defines.SELECTIVE = this.selective;
 		this.ssrMaterial.needsUpdate = true;
 		this.ssrMaterial.uniforms[ 'tMetalness' ].value = this.metalnessRenderTarget.texture;
-		this.ssrMaterial.uniforms[ 'tDepth' ].value = this.beautyRenderTarget.depthTexture;
+		this.ssrMaterial.uniforms[ 'tDepth' ].value = this.normalRenderTarget.depthTexture;
 		this.ssrMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
 		this.ssrMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
 		this.ssrMaterial.uniforms[ 'thickness' ].value = this.thickness;
@@ -296,7 +303,7 @@ class SSRPass extends Pass {
 			fragmentShader: SSRDepthShader.fragmentShader,
 			blending: NoBlending
 		} );
-		this.depthRenderMaterial.uniforms[ 'tDepth' ].value = this.beautyRenderTarget.depthTexture;
+		this.depthRenderMaterial.uniforms[ 'tDepth' ].value = this.normalRenderTarget.depthTexture;
 		this.depthRenderMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
 		this.depthRenderMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
 
@@ -328,7 +335,7 @@ class SSRPass extends Pass {
 
 		// dispose render targets
 
-		this.beautyRenderTarget.dispose();
+		// this.beautyRenderTarget.dispose();
 		this.prevRenderTarget.dispose();
 		this.normalRenderTarget.dispose();
 		this.metalnessRenderTarget.dispose();
@@ -353,22 +360,23 @@ class SSRPass extends Pass {
 
 	}
 
-	render( renderer, writeBuffer /*, readBuffer, deltaTime, maskActive */ ) {
+	render( renderer, writeBuffer, readBuffer /*, deltaTime, maskActive */ ) {
+		// console.log('selective',this.selective)
 
 		// render beauty and depth
 
-		renderer.setRenderTarget( this.beautyRenderTarget );
-		renderer.clear();
-		if ( this.groundReflector ) {
+		// renderer.setRenderTarget( this.beautyRenderTarget );
+		// renderer.clear();
+		// if ( this.groundReflector ) {
 
-			this.groundReflector.visible = false;
-			this.groundReflector.doRender( this.renderer, this.scene, this.camera );
-			this.groundReflector.visible = true;
+		// 	this.groundReflector.visible = false;
+		// 	this.groundReflector.doRender( this.renderer, this.scene, this.camera );
+		// 	this.groundReflector.visible = true;
 
-		}
+		// }
 
-		renderer.render( this.scene, this.camera );
-		if ( this.groundReflector ) this.groundReflector.visible = false;
+		// renderer.render( this.scene, this.camera );
+		// if ( this.groundReflector ) this.groundReflector.visible = false;
 
 		// render normals
 
@@ -384,6 +392,7 @@ class SSRPass extends Pass {
 
 		// render SSR
 
+		this.ssrMaterial.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
 		this.ssrMaterial.uniforms[ 'opacity' ].value = this.opacity;
 		this.ssrMaterial.uniforms[ 'maxDistance' ].value = this.maxDistance;
 		this.ssrMaterial.uniforms[ 'thickness' ].value = this.thickness;
@@ -408,7 +417,7 @@ class SSRPass extends Pass {
 
 				if ( this.bouncing ) {
 
-					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
 					this.copyMaterial.blending = NoBlending;
 					this.renderPass( renderer, this.copyMaterial, this.prevRenderTarget );
 
@@ -425,7 +434,7 @@ class SSRPass extends Pass {
 
 				} else {
 
-					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
 					this.copyMaterial.blending = NoBlending;
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 
@@ -453,7 +462,7 @@ class SSRPass extends Pass {
 					if ( this.blur )
 						this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.blurRenderTarget2.texture;
 					else
-						this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+						this.copyMaterial.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
 					this.copyMaterial.blending = NoBlending;
 					this.renderPass( renderer, this.copyMaterial, this.prevRenderTarget );
 
@@ -467,7 +476,7 @@ class SSRPass extends Pass {
 
 			case SSRPass.OUTPUT.Beauty:
 
-				this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+				this.copyMaterial.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
 				this.copyMaterial.blending = NoBlending;
 				this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 
@@ -619,7 +628,7 @@ class SSRPass extends Pass {
 
 		this.ssrMaterial.defines.MAX_STEP = Math.sqrt( width * width + height * height );
 		this.ssrMaterial.needsUpdate = true;
-		this.beautyRenderTarget.setSize( width, height );
+		// this.beautyRenderTarget.setSize( width, height );
 		this.prevRenderTarget.setSize( width, height );
 		this.ssrRenderTarget.setSize( width, height );
 		this.normalRenderTarget.setSize( width, height );
