@@ -141,8 +141,12 @@ var SSRShader = {
 				float metalness=texture2D(tMetalness,vUv).r;
 				if(metalness==0.) return;
 			#endif
+			vec2 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 30., vUv.y) * 2.).rg * 2.0 - 1.0) * 0.1;
+			vec2 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x + uTime / 10., vUv.y - uTime / 30.) * 2.).rg * 2.0 - 1.0) * 0.1;
+			vec2 reflectUv = vUv + distortion + distortion2;
+			reflectUv = clamp(reflectUv, 0.001, 0.999);
 
-			float depth = getDepth( vUv );
+			float depth = getDepth( reflectUv );
 			float viewZ = getViewZ( depth );
 			if(-viewZ>=cameraFar) return;
 
@@ -152,7 +156,7 @@ var SSRShader = {
 			vec2 d0=gl_FragCoord.xy;
 			vec2 d1;
 
-			vec3 viewNormal=getViewNormal( vUv );
+			vec3 viewNormal=getViewNormal( reflectUv );
 
 			#ifdef PERSPECTIVE_CAMERA
 				vec3 viewIncidentDir=normalize(viewPosition);
@@ -243,13 +247,7 @@ var SSRShader = {
 							float fresnelCoe=(dot(viewIncidentDir,viewReflectDir)+1.)/2.;
 							op*=fresnelCoe;
 						#endif
-						vec4 influence = texture2D(distortionTexture, uv);
-						if(influence.r + influence.g + influence.b > 0.3){
-							uv.y += sin(uv.x * 40.0 + (uTime * 2.5))*0.005;
-							uv.x += cos(uv.y * 40.0 + (uTime * 2.5))*0.01;
-							uv.x -= cos(uv.y*5.2+uTime*1.4)/100.0;
-							uv.y -= cos(uv.x*5.2+uTime*1.4)/100.0;
-						}
+						
 
 						vec4 reflectColor=texture2D(tDiffuse,uv);
 						gl_FragColor.xyz=reflectColor.xyz;
@@ -367,7 +365,7 @@ var SSRBlurShader = {
 
 			vec2 offset;
 
-			offset=(vec2(-1,0))*texelSize;
+			offset=(vec2(-1,0))*texelSize * 10.;
 			vec4 cl=texture2D(tDiffuse,vUv+offset);
 
 			offset=(vec2(1,0))*texelSize;
