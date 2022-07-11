@@ -158,25 +158,25 @@ var SSRShader = {
 			#endif
 
 			// v1
-			// vec2 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 60., vUv.y + uTime / 20.) * 4.).rg * 2.0 - 1.0) * 0.1;
-			// vec2 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 10., vUv.y - uTime / 30.) * 3.).rg * 2.0 - 1.0) * 0.1;
-			// vec2 reflectUv = vUv + distortion + distortion2;
-			// reflectUv = clamp(reflectUv, 0.001, 0.999);
+			vec3 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
+			vec3 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 30., vUv.y - uTime / 30.) * 6.).rgb) * 0.025;
+			vec3 reflectUv = distortion;
+			reflectUv = clamp(reflectUv, 0.001, 0.999);
 
 			// v2
-			vec2 flowmap = texture2D(distortionTexture, vUv / 20.).rg * 2. - 1.;
-			flowmap *= 0.15;
-			float noise = texture2D(distortionTexture, vUv).a;
-			float time = uTime * 1. + noise;
-			vec2 jump = vec2(0.24, 0.208);
-			vec3 uvwA = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, false);
-			vec3 uvwB = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, true);
+			// vec2 flowmap = texture2D(distortionTexture, vUv / 20.).rg * 2. - 1.;
+			// flowmap *= 0.15;
+			// float noise = texture2D(distortionTexture, vUv).a;
+			// float time = uTime * 1. + noise;
+			// vec2 jump = vec2(0.24, 0.208);
+			// vec3 uvwA = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, false);
+			// vec3 uvwB = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, true);
 
-			vec2 texA = (texture2D(distortionTexture, uvwA.xy) * uvwA.z).rg;
-            vec2 texB = (texture2D(distortionTexture, uvwB.xy) * uvwB.z).rg;
-			vec2 reflectUv = (vUv + texA.rg + texB.rg) * 0.5;
+			// vec2 texA = (texture2D(distortionTexture, uvwA.xy) * uvwA.z).rg;
+            // vec2 texB = (texture2D(distortionTexture, uvwB.xy) * uvwB.z).rg;
+			// vec2 reflectUv = (vUv + texA.rg + texB.rg) * 0.5;
 
-			float depth = getDepth( reflectUv );
+			float depth = getDepth( vUv );
 			float viewZ = getViewZ( depth );
 			if(-viewZ>=cameraFar) return;
 
@@ -186,8 +186,8 @@ var SSRShader = {
 			vec2 d0=gl_FragCoord.xy;
 			vec2 d1;
 
-			vec3 viewNormal=getViewNormal( reflectUv );
-
+			vec3 viewNormal=getViewNormal( vUv ) + reflectUv;
+			viewNormal.y = abs(viewNormal.y);
 			#ifdef PERSPECTIVE_CAMERA
 				vec3 viewIncidentDir=normalize(viewPosition);
 				vec3 viewReflectDir=reflect(viewIncidentDir,viewNormal);
@@ -395,7 +395,7 @@ var SSRBlurShader = {
 
 			vec2 offset;
 
-			offset=(vec2(-1,0))*texelSize * 10.;
+			offset=(vec2(-1,0))*texelSize;
 			vec4 cl=texture2D(tDiffuse,vUv+offset);
 
 			offset=(vec2(1,0))*texelSize;
@@ -421,4 +421,68 @@ var SSRBlurShader = {
 
 };
 
-export { SSRShader, SSRDepthShader, SSRBlurShader };
+var EdgeBlurShader = {
+
+	uniforms: {
+
+		'tDiffuse': { value: null },
+		'resolution': { value: new Vector2() },
+		'opacity': { value: .5 },
+		'h': { value: 0 },
+		'v': { value: 0 },
+
+	},
+
+	vertexShader: /* glsl */`
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}
+
+	`,
+
+	fragmentShader: /* glsl */`
+
+		uniform sampler2D tDiffuse;
+		uniform vec2 resolution;
+		uniform float h;
+		uniform float v;
+		varying vec2 vUv;
+		void main() {
+			vec4 c=texture2D(tDiffuse,vUv);
+			// if(vUv.x > 0.9 || vUv.x < 0.1){
+				vec4 sum = vec4( 0.0 );
+				sum += texture2D( tDiffuse, vec2( vUv.x - 4.0 * h, vUv.y ) ) * 0.051;
+				sum += texture2D( tDiffuse, vec2( vUv.x - 3.0 * h, vUv.y ) ) * 0.0918;
+				sum += texture2D( tDiffuse, vec2( vUv.x - 2.0 * h, vUv.y ) ) * 0.12245;
+				sum += texture2D( tDiffuse, vec2( vUv.x - 1.0 * h, vUv.y ) ) * 0.1531;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
+				sum += texture2D( tDiffuse, vec2( vUv.x + 1.0 * h, vUv.y ) ) * 0.1531;
+				sum += texture2D( tDiffuse, vec2( vUv.x + 2.0 * h, vUv.y ) ) * 0.12245;
+				sum += texture2D( tDiffuse, vec2( vUv.x + 3.0 * h, vUv.y ) ) * 0.0918;
+				sum += texture2D( tDiffuse, vec2( vUv.x + 4.0 * h, vUv.y ) ) * 0.051;
+
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 4.0 * v ) ) * 0.051;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 3.0 * v ) ) * 0.0918;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 2.0 * v ) ) * 0.12245;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 1.0 * v ) ) * 0.1531;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 1.0 * v ) ) * 0.1531;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 2.0 * v ) ) * 0.12245;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 3.0 * v ) ) * 0.0918;
+				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 4.0 * v ) ) * 0.051;
+				gl_FragColor = sum;
+			// }
+
+		}
+	`
+
+
+};
+
+export { SSRShader, SSRDepthShader, SSRBlurShader, EdgeBlurShader };
