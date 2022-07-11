@@ -136,15 +136,45 @@ var SSRShader = {
 			return xy;
 		}
 
+		float frac(float v){
+			return v - floor(v);
+		}
+		vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
+			float phaseOffset = flowB ? 0.5 : 0.;
+			float progress = frac(time + phaseOffset);
+			vec3 uvw;
+			uvw.xy = uv - flowVector * (progress + flowOffset);
+			uvw.xy *= tiling;
+			uvw.xy += phaseOffset;
+			uvw.xy += (time - progress) * jump;
+			uvw.z = 1. - abs(1. - 2. * progress);
+			return uvw;
+		}
+
 		void main(){
 			#ifdef SELECTIVE
 				float metalness=texture2D(tMetalness,vUv).r;
 				if(metalness==0.) return;
 			#endif
-			vec2 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 30., vUv.y) * 2.).rg * 2.0 - 1.0) * 0.1;
-			vec2 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x + uTime / 10., vUv.y - uTime / 30.) * 2.).rg * 2.0 - 1.0) * 0.1;
-			vec2 reflectUv = vUv + distortion + distortion2;
-			reflectUv = clamp(reflectUv, 0.001, 0.999);
+
+			// v1
+			// vec2 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 60., vUv.y + uTime / 20.) * 4.).rg * 2.0 - 1.0) * 0.1;
+			// vec2 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 10., vUv.y - uTime / 30.) * 3.).rg * 2.0 - 1.0) * 0.1;
+			// vec2 reflectUv = vUv + distortion + distortion2;
+			// reflectUv = clamp(reflectUv, 0.001, 0.999);
+
+			// v2
+			vec2 flowmap = texture2D(distortionTexture, vUv / 20.).rg * 2. - 1.;
+			flowmap *= 0.15;
+			float noise = texture2D(distortionTexture, vUv).a;
+			float time = uTime * 1. + noise;
+			vec2 jump = vec2(0.24, 0.208);
+			vec3 uvwA = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, false);
+			vec3 uvwB = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, true);
+
+			vec2 texA = (texture2D(distortionTexture, uvwA.xy) * uvwA.z).rg;
+            vec2 texB = (texture2D(distortionTexture, uvwB.xy) * uvwB.z).rg;
+			vec2 reflectUv = (vUv + texA.rg + texB.rg) * 0.5;
 
 			float depth = getDepth( reflectUv );
 			float viewZ = getViewZ( depth );
