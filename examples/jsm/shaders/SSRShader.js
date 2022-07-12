@@ -436,11 +436,18 @@ var EdgeBlurShader = {
 	vertexShader: /* glsl */`
 
 		varying vec2 vUv;
+		varying vec3 vPos;
 
 		void main() {
 
 			vUv = uv;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+			vec3 pos = position;
+			vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+			vec4 viewPosition = viewMatrix * modelPosition;
+			vec4 projectionPosition = projectionMatrix * viewPosition;
+	
+			gl_Position = projectionPosition;
+			vPos = modelPosition.xyz;
 
 		}
 
@@ -453,30 +460,42 @@ var EdgeBlurShader = {
 		uniform float h;
 		uniform float v;
 		varying vec2 vUv;
+		varying vec3 vPos;
 		void main() {
 			vec4 c=texture2D(tDiffuse,vUv);
-			// if(vUv.x > 0.9 || vUv.x < 0.1){
+			// gl_FragColor = c; return; // test
+			// if((vUv.x > 0.9 || vUv.x < 0.1)){
 				vec4 sum = vec4( 0.0 );
-				sum += texture2D( tDiffuse, vec2( vUv.x - 4.0 * h, vUv.y ) ) * 0.051;
-				sum += texture2D( tDiffuse, vec2( vUv.x - 3.0 * h, vUv.y ) ) * 0.0918;
-				sum += texture2D( tDiffuse, vec2( vUv.x - 2.0 * h, vUv.y ) ) * 0.12245;
-				sum += texture2D( tDiffuse, vec2( vUv.x - 1.0 * h, vUv.y ) ) * 0.1531;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
-				sum += texture2D( tDiffuse, vec2( vUv.x + 1.0 * h, vUv.y ) ) * 0.1531;
-				sum += texture2D( tDiffuse, vec2( vUv.x + 2.0 * h, vUv.y ) ) * 0.12245;
-				sum += texture2D( tDiffuse, vec2( vUv.x + 3.0 * h, vUv.y ) ) * 0.0918;
-				sum += texture2D( tDiffuse, vec2( vUv.x + 4.0 * h, vUv.y ) ) * 0.051;
-
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 4.0 * v ) ) * 0.051;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 3.0 * v ) ) * 0.0918;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 2.0 * v ) ) * 0.12245;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 1.0 * v ) ) * 0.1531;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 1.0 * v ) ) * 0.1531;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 2.0 * v ) ) * 0.12245;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 3.0 * v ) ) * 0.0918;
-				sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 4.0 * v ) ) * 0.051;
+				if(v < -1.){
+					float h2 = h * abs(vUv.x - 0.5) * abs(vUv.x - 0.5);
+					sum += texture2D( tDiffuse, vec2( vUv.x - 4.0 * h2, vUv.y ) ) * 0.051;
+					sum += texture2D( tDiffuse, vec2( vUv.x - 3.0 * h2, vUv.y ) ) * 0.0918;
+					sum += texture2D( tDiffuse, vec2( vUv.x - 2.0 * h2, vUv.y ) ) * 0.12245;
+					sum += texture2D( tDiffuse, vec2( vUv.x - 1.0 * h2, vUv.y ) ) * 0.1531;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
+					sum += texture2D( tDiffuse, vec2( vUv.x + 1.0 * h2, vUv.y ) ) * 0.1531;
+					sum += texture2D( tDiffuse, vec2( vUv.x + 2.0 * h2, vUv.y ) ) * 0.12245;
+					sum += texture2D( tDiffuse, vec2( vUv.x + 3.0 * h2, vUv.y ) ) * 0.0918;
+					sum += texture2D( tDiffuse, vec2( vUv.x + 4.0 * h2, vUv.y ) ) * 0.051;
+				}
+				else{
+					float v2 = v * abs(vUv.x - 0.5) * abs(vUv.x - 0.5);
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 4.0 * v2 ) ) * 0.051;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 3.0 * v2 ) ) * 0.0918;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 2.0 * v2 ) ) * 0.12245;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 1.0 * v2 ) ) * 0.1531;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 1.0 * v2 ) ) * 0.1531;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 2.0 * v2 ) ) * 0.12245;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 3.0 * v2 ) ) * 0.0918;
+					sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 4.0 * v2 ) ) * 0.051;
+				}
+				
 				gl_FragColor = sum;
+				// gl_FragColor.r *= 5.;
+			// }
+			// else{
+			// 	gl_FragColor = texture2D(tDiffuse, vUv); 
 			// }
 
 		}
