@@ -22,6 +22,7 @@ import { SSRBlurShader } from '../shaders/SSRShader.js';
 import { EdgeHBlurShader, EdgeVBlurShader, MaskShader } from '../shaders/SSRShader.js';
 import { SSRDepthShader } from '../shaders/SSRShader.js';
 import { CopyShader } from '../shaders/CopyShader.js';
+import { DoubleSide } from 'three';
 
 class SSRPass extends Pass {
 
@@ -253,19 +254,23 @@ class SSRPass extends Pass {
 
 		// normal material
 
-		this.normalMaterial = new MeshNormalMaterial();
+		this.normalMaterial = new MeshNormalMaterial({
+			side: DoubleSide,
+		});
 		this.normalMaterial.blending = NoBlending;
 
 		// metalnessOn material
 
 		this.metalnessOnMaterial = new MeshBasicMaterial( {
-			color: 'white'
+			color: 'white',
+			side: DoubleSide,
 		} );
 
 		// metalnessOff material
 
 		this.metalnessOffMaterial = new MeshBasicMaterial( {
-			color: 'black'
+			color: 'black',
+			side: DoubleSide,
 		} );
 
 		// blur material
@@ -482,18 +487,22 @@ class SSRPass extends Pass {
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 
 					
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 15. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 5. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = writeBuffer.texture;
+					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget);
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 13. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 3. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget.texture;
+					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget2);
 					
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 15. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 5. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget2.texture;
+					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget);
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 13. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 3. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget.texture;
+					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget2);
 					
 					this.maskMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget2.texture;
@@ -631,6 +640,49 @@ class SSRPass extends Pass {
 
 	}
 
+	renderEdgeBlur( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
+
+		this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
+		const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
+		const originalAutoClear = renderer.autoClear;
+
+		renderer.setRenderTarget( renderTarget );
+
+		// setup pass state
+		renderer.autoClear = false;
+		if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
+
+			renderer.setClearColor( clearColor );
+			renderer.setClearAlpha( clearAlpha || 0.0 );
+			renderer.clear();
+
+		}
+
+		this.scene.traverseVisible( child => {
+
+			child._SSRPassBackupMaterial = child.material;
+			if ( this._selects.includes( child ) ) {
+
+				child.material = overrideMaterial;
+
+			} 
+
+		} );
+		
+		renderer.render( this.scene, this.camera );
+		this.scene.traverseVisible( child => {
+
+			child.material = child._SSRPassBackupMaterial;
+
+		} );
+
+		// restore original state
+
+		renderer.autoClear = originalAutoClear;
+		renderer.setClearColor( this.originalClearColor );
+		renderer.setClearAlpha( originalClearAlpha );
+
+	}
 	renderMetalness( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
 
 		this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );

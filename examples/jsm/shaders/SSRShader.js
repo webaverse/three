@@ -426,6 +426,7 @@ var EdgeHBlurShader = {
 	uniforms: {
 
 		'tDiffuse': { value: null },
+		'tMask': { value: null },
 		'h': { value: 0 },
 
 	},
@@ -446,21 +447,50 @@ var EdgeHBlurShader = {
 	fragmentShader: /* glsl */`
 
 		uniform sampler2D tDiffuse;
+		uniform sampler2D tMask;
 		uniform float h;
 		varying vec2 vUv;
 		void main() {
 
 			vec4 sum = vec4( 0.0 );
-
-			sum += texture2D( tDiffuse, vec2( vUv.x - 4.0 * h, vUv.y ) ) * 0.051;
-			sum += texture2D( tDiffuse, vec2( vUv.x - 3.0 * h, vUv.y ) ) * 0.0918;
-			sum += texture2D( tDiffuse, vec2( vUv.x - 2.0 * h, vUv.y ) ) * 0.12245;
-			sum += texture2D( tDiffuse, vec2( vUv.x - 1.0 * h, vUv.y ) ) * 0.1531;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 1.0 * h, vUv.y ) ) * 0.1531;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 2.0 * h, vUv.y ) ) * 0.12245;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 3.0 * h, vUv.y ) ) * 0.0918;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 4.0 * h, vUv.y ) ) * 0.051;
+			vec2 uv;
+			float mask;
+			
+			uv = vec2( vUv.x - 4.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
+			
+			uv = vec2( vUv.x - 3.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
+			
+			uv = vec2( vUv.x - 2.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
+			
+			uv = vec2( vUv.x - 1.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
+			
+			uv = vec2( vUv.x, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.1633 * mask;
+			
+			uv = vec2( vUv.x + 1.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
+			
+			uv = vec2( vUv.x + 2.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
+			
+			uv = vec2( vUv.x + 3.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
+			
+			uv = vec2( vUv.x + 4.0 * h, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
 
 			gl_FragColor = sum;
 
@@ -475,6 +505,7 @@ var EdgeVBlurShader = {
 	uniforms: {
 
 		'tDiffuse': { value: null },
+		'tMask': { value: null },
 		'v': { value: 0 },
 
 	},
@@ -495,6 +526,7 @@ var EdgeVBlurShader = {
 	fragmentShader: /* glsl */`
 
 		uniform sampler2D tDiffuse;
+		uniform sampler2D tMask;
 		uniform float v;
 
 		varying vec2 vUv;
@@ -502,16 +534,44 @@ var EdgeVBlurShader = {
 		void main() {
 
 			vec4 sum = vec4( 0.0 );
-
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 4.0 * v ) ) * 0.051;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 3.0 * v ) ) * 0.0918;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 2.0 * v ) ) * 0.12245;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y - 1.0 * v ) ) * 0.1531;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 1.0 * v ) ) * 0.1531;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 2.0 * v ) ) * 0.12245;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 3.0 * v ) ) * 0.0918;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y + 4.0 * v ) ) * 0.051;
+			vec2 uv;
+			float mask;
+			
+			uv = vec2( vUv.x, vUv.y - 4.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
+			
+			uv = vec2( vUv.x, vUv.y - 3.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
+			
+			uv = vec2( vUv.x, vUv.y - 2.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
+			
+			uv = vec2( vUv.x, vUv.y - 1.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
+			
+			uv = vec2( vUv.x, vUv.y );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.1633 * mask;
+			
+			uv = vec2( vUv.x, vUv.y + 1.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
+			
+			uv = vec2( vUv.x, vUv.y + 2.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
+			
+			uv = vec2( vUv.x, vUv.y + 3.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
+			
+			uv = vec2( vUv.x, vUv.y + 4.0 * v );
+			mask = texture2D( tMask, uv ).r;
+			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
 
 			gl_FragColor = sum;
 
