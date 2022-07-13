@@ -19,7 +19,7 @@ import {
 import { Pass, FullScreenQuad } from '../postprocessing/Pass.js';
 import { SSRShader } from '../shaders/SSRShader.js';
 import { SSRBlurShader } from '../shaders/SSRShader.js';
-import { EdgeBlurShader } from '../shaders/SSRShader.js';
+import { EdgeHBlurShader, EdgeVBlurShader, MaskShader } from '../shaders/SSRShader.js';
 import { SSRDepthShader } from '../shaders/SSRShader.js';
 import { CopyShader } from '../shaders/CopyShader.js';
 
@@ -214,7 +214,10 @@ class SSRPass extends Pass {
 		this.blurRenderTarget2 = this.ssrRenderTarget.clone();
 		// this.blurRenderTarget3 = this.ssrRenderTarget.clone();
 		this.edgeHBlurRenderTarget = this.ssrRenderTarget.clone();
+		this.edgeHBlurRenderTarget2 = this.ssrRenderTarget.clone();
 		this.edgeVBlurRenderTarget = this.ssrRenderTarget.clone();
+		this.edgeVBlurRenderTarget2 = this.ssrRenderTarget.clone();
+		this.maskRenderTarget = this.ssrRenderTarget.clone();
 
 
 		// ssr material
@@ -299,22 +302,27 @@ class SSRPass extends Pass {
 		// this.blurMaterial3.uniforms['resolution'].value.set(this.width, this.height);
 
 		this.edgeHBlurMaterial  = new ShaderMaterial( {
-			defines: Object.assign( {}, EdgeBlurShader.defines ),
-			uniforms: UniformsUtils.clone( EdgeBlurShader.uniforms ),
-			vertexShader: EdgeBlurShader.vertexShader,
-			fragmentShader: EdgeBlurShader.fragmentShader
+			defines: Object.assign( {}, EdgeHBlurShader.defines ),
+			uniforms: UniformsUtils.clone( EdgeHBlurShader.uniforms ),
+			vertexShader: EdgeHBlurShader.vertexShader,
+			fragmentShader: EdgeHBlurShader.fragmentShader
 		} );
-		this.edgeHBlurMaterial .uniforms[ 'tDiffuse' ].value = this.ssrRenderTarget.texture;
-		this.edgeHBlurMaterial .uniforms[ 'resolution' ].value.set( this.width, this.height );
+		// this.edgeHBlurMaterial .uniforms[ 'tDiffuse' ].value = this.ssrRenderTarget.texture;
 
 		this.edgeVBlurMaterial  = new ShaderMaterial( {
-			defines: Object.assign( {}, EdgeBlurShader.defines ),
-			uniforms: UniformsUtils.clone( EdgeBlurShader.uniforms ),
-			vertexShader: EdgeBlurShader.vertexShader,
-			fragmentShader: EdgeBlurShader.fragmentShader
+			defines: Object.assign( {}, EdgeVBlurShader.defines ),
+			uniforms: UniformsUtils.clone( EdgeVBlurShader.uniforms ),
+			vertexShader: EdgeVBlurShader.vertexShader,
+			fragmentShader: EdgeVBlurShader.fragmentShader
 		} );
-		this.edgeVBlurMaterial .uniforms[ 'tDiffuse' ].value = this.ssrRenderTarget.texture;
-		this.edgeVBlurMaterial .uniforms[ 'resolution' ].value.set( this.width, this.height );
+		// this.edgeVBlurMaterial .uniforms[ 'tDiffuse' ].value = this.ssrRenderTarget.texture;
+
+		this.maskMaterial  = new ShaderMaterial( {
+			defines: Object.assign( {}, MaskShader.defines ),
+			uniforms: UniformsUtils.clone( MaskShader.uniforms ),
+			vertexShader: MaskShader.vertexShader,
+			fragmentShader: MaskShader.fragmentShader
+		} );
 
 		// material for rendering the depth
 
@@ -366,7 +374,10 @@ class SSRPass extends Pass {
 		this.blurRenderTarget2.dispose();
 		// this.blurRenderTarget3.dispose();
 		this.edgeHBlurRenderTarget.dispose();
+		this.edgeHBlurRenderTarget2.dispose();
 		this.edgeVBlurRenderTarget.dispose();
+		this.edgeVBlurRenderTarget2.dispose();
+		this.maskRenderTarget.dispose();
 
 		// dispose materials
 
@@ -377,6 +388,7 @@ class SSRPass extends Pass {
 		this.blurMaterial2.dispose();
 		this.edgeHBlurMaterial.dispose();
 		this.edgeVBlurMaterial.dispose();
+		this.maskMaterial.dispose();
 		this.copyMaterial.dispose();
 		this.depthRenderMaterial.dispose();
 
@@ -470,18 +482,26 @@ class SSRPass extends Pass {
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 
 					
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 15 * 1.0 / window.innerWidth * window.devicePixelRatio;
-					this.edgeHBlurMaterial.uniforms[ 'v' ].value = -100;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 15. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = writeBuffer.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget);
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 13. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget.texture;
+					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget2);
 					
-					this.edgeVBlurMaterial.uniforms[ 'h' ].value = -100;
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 15 * 1.0 / window.innerHeight * window.devicePixelRatio;
-					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget.texture;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 15. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget2.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget);
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 13. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget.texture;
+					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget2);
+					
+					this.maskMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget2.texture;
+					this.maskMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					this.renderPass( renderer, this.maskMaterial, this.maskRenderTarget);
 
-					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget.texture;
-					this.copyMaterial.blending = NoBlending;
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
+					this.copyMaterial.blending = NormalBlending;
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 					
 				}
@@ -611,49 +631,6 @@ class SSRPass extends Pass {
 
 	}
 
-	renderEdgeBlur( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
-
-		this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
-		const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
-		const originalAutoClear = renderer.autoClear;
-
-		renderer.setRenderTarget( renderTarget );
-
-		// setup pass state
-		renderer.autoClear = false;
-		if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
-
-			renderer.setClearColor( clearColor );
-			renderer.setClearAlpha( clearAlpha || 0.0 );
-			renderer.clear();
-
-		}
-
-		this.scene.traverseVisible( child => {
-
-			child._SSRPassBackupMaterial = child.material;
-			if ( this._selects.includes( child ) ) {
-
-				child.material = overrideMaterial;
-
-			} 
-
-		} );
-		
-		renderer.render( this.scene, this.camera );
-		this.scene.traverseVisible( child => {
-
-			child.material = child._SSRPassBackupMaterial;
-
-		} );
-
-		// restore original state
-
-		renderer.autoClear = originalAutoClear;
-		renderer.setClearColor( this.originalClearColor );
-		renderer.setClearAlpha( originalClearAlpha );
-
-	}
 	renderMetalness( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
 
 		this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
