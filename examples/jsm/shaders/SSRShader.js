@@ -159,8 +159,8 @@ var SSRShader = {
 
 			// v1
 			vec3 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
-			vec3 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 30., vUv.y - uTime / 30.) * 6.).rgb) * 0.025;
-			vec3 reflectUv = distortion;
+			vec3 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 30., vUv.y - uTime / 30.)).rgb) * 0.025;
+			vec3 reflectUv = distortion + distortion2;
 			reflectUv = clamp(reflectUv, 0.001, 0.999);
 
 			// v2
