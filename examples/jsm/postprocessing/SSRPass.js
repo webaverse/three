@@ -26,7 +26,7 @@ import { DoubleSide } from 'three';
 
 class SSRPass extends Pass {
 
-	constructor( { renderer, scene, camera, width, height, selects, bouncing = false, groundReflector, foamDepthMaterial, foamRenderTarget, water } ) {
+	constructor( { renderer, scene, camera, width, height, selects, bouncing = false, groundReflector, foamDepthMaterial, foamRenderTarget, invisibleSelects } ) {
 
 		super();
 
@@ -50,7 +50,7 @@ class SSRPass extends Pass {
 
 		this.foamDepthMaterial = foamDepthMaterial;
 		this.foamRenderTarget = foamRenderTarget;
-		this.water = water;
+		this.invisibleSelects = invisibleSelects;
 
 		this._selects = selects;
 		this.selective = Array.isArray( this._selects );
@@ -409,42 +409,7 @@ class SSRPass extends Pass {
 
 	render( renderer, writeBuffer, readBuffer /*, deltaTime, maskActive */ ) {
 
-		if(this.foamDepthMaterial && this.foamRenderTarget && this.water){
-
-            this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
-            const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
-            const originalAutoClear = renderer.autoClear;
-
-            renderer.setRenderTarget(this.foamRenderTarget);
-            renderer.autoClear = false;
-
-            const clearColor = this.foamDepthMaterial.clearColor || 0;
-            const clearAlpha = this.foamDepthMaterial.clearAlpha || 0;
-
-            if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
-
-                renderer.setClearColor( clearColor );
-                renderer.setClearAlpha( clearAlpha || 0.0 );
-                renderer.clear();
-
-            }
-
-
-
-            this.water.visible = false; 
-            this.scene.overrideMaterial = this.foamDepthMaterial;
-      
-            // renderer.setRenderTarget(this.renderTarget);
-            renderer.render(this.scene, this.camera);
-            renderer.setRenderTarget(null);
-      
-            this.scene.overrideMaterial = null;
-            this.water.visible = true;
-
-            renderer.autoClear = originalAutoClear;
-            renderer.setClearColor( this.originalClearColor );
-            renderer.setClearAlpha( originalClearAlpha );
-        }
+		
 		// console.log('selective',this.selective)
 
 		// render beauty and depth
@@ -617,6 +582,45 @@ class SSRPass extends Pass {
 				console.warn( 'THREE.SSRPass: Unknown output type.' );
 
 		}
+		if(this.foamDepthMaterial && this.foamRenderTarget){
+
+            this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
+            const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
+            const originalAutoClear = renderer.autoClear;
+
+            renderer.setRenderTarget(this.foamRenderTarget);
+            renderer.autoClear = false;
+
+            const clearColor = this.foamDepthMaterial.clearColor || 0;
+            const clearAlpha = this.foamDepthMaterial.clearAlpha || 0;
+
+            if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
+
+                renderer.setClearColor( clearColor );
+                renderer.setClearAlpha( clearAlpha || 0.0 );
+                renderer.clear();
+
+            }
+
+			for(const invisibleSelect of this.invisibleSelects){
+				
+				invisibleSelect.visible = false; 
+			}
+            this.scene.overrideMaterial = this.foamDepthMaterial;
+      
+            // renderer.setRenderTarget(this.renderTarget);
+            renderer.render(this.scene, this.camera);
+            renderer.setRenderTarget(null);
+      
+            this.scene.overrideMaterial = null;
+			for(const invisibleSelect of this.invisibleSelects){
+				invisibleSelect.visible = true; 
+			}
+
+            renderer.autoClear = originalAutoClear;
+            renderer.setClearColor( this.originalClearColor );
+            renderer.setClearAlpha( originalClearAlpha );
+        }
 
 	}
 
