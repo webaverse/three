@@ -546,28 +546,28 @@ class SSRPass extends Pass {
 					this.renderPass( renderer, this.blankMaterial, this.blankRenderTarget );
 
 					
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 10. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 20. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.blankRenderTarget.texture;
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget3);
 
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 7. * 1.0 / window.innerWidth * window.devicePixelRatio;
-					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
-					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
-					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget4);
+					// this.edgeHBlurMaterial.uniforms[ 'h' ].value = 7. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					// this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
+					// this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					// this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget4);
 					
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 10. * 1.0 / window.innerHeight * window.devicePixelRatio;
-					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget4.texture;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 1. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
 					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget3);
 
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 7. * 1.0 / window.innerHeight * window.devicePixelRatio;
-					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget3.texture;
-					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
-					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget4);
+					// this.edgeVBlurMaterial.uniforms[ 'v' ].value = 7. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					// this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget3.texture;
+					// this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					// this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget4);
 					
 					this.combineMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
-					this.combineMaterial.uniforms[ 'tMask' ].value = this.edgeVBlurRenderTarget4.texture;
+					this.combineMaterial.uniforms[ 'tMask' ].value = this.edgeVBlurRenderTarget3.texture;
 					this.combineMaterial.uniforms[ 'tPlayer' ].value = this.playerRenderTarget.texture;
 					this.combineMaterial.uniforms[ 'resolution' ].value.set(
 						window.innerWidth * window.devicePixelRatio,

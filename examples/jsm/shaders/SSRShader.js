@@ -758,21 +758,22 @@ var CombineShader = {
 				(vUv.y - 0.5) * 2.0,
 				(normalizedDepth - 0.5) * 2.0,
 				1.0);
+
 			
 			vec4 clip = cameraInverseProjectionMatrix * ndc;
 			vec4 view = uMatrixWorld * (clip / clip.w);
 			vec3 worldPos = view.xyz;
 			
 
-			if(mask.a > 0.1 && player.r > 0.1){
+			if(mask.a > 0.1 && mask.r < 1. && player.r > 0.1){
                 float diff = mask.r;
         
-                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 12. ) - time * 0.05 ).rg;
+                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 10. ) - time * 0.05 ).rg;
                 displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
                 diff += displacement.x;
         
-                gl_FragColor.rgb = mix( vec3(1.0, 1.0, 1.0), diffuse.rgb, step( 0.15, diff ) );
-				gl_FragColor.a = diffuse.a;
+                gl_FragColor = mix( vec4(1.0, 1.0, 1.0, diffuse.a), diffuse, step( 0.5, diff ) );
+				// gl_FragColor.a = diffuse.a;
 			}
 			else{
 				gl_FragColor = diffuse;
