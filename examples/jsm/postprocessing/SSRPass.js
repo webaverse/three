@@ -15,6 +15,7 @@ import {
 	UnsignedShortType,
 	WebGLRenderTarget,
 	HalfFloatType,
+	Matrix4
 } from '../../../build/three.module.js';
 import { Pass, FullScreenQuad } from '../postprocessing/Pass.js';
 import { SSRShader } from '../shaders/SSRShader.js';
@@ -383,9 +384,15 @@ class SSRPass extends Pass {
 			defines: Object.assign( {}, CombineShader.defines ),
 			uniforms: UniformsUtils.clone( CombineShader.uniforms ),
 			vertexShader: CombineShader.vertexShader,
-			fragmentShader: CombineShader.fragmentShader
+			fragmentShader: CombineShader.fragmentShader,
 		} );
 		this.combineRenderTarget = this.ssrRenderTarget.clone();
+		this.combineMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
+		this.combineMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
+		this.combineMaterial.uniforms[ 'cameraProjectionMatrix' ].value.copy( this.camera.projectionMatrix );
+		this.combineMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse );
+		this.combineMaterial.uniforms[ 'cameraMatrixWorldInverse' ].value.copy( this.camera.matrixWorldInverse );
+		
 
 		this.playerOnMaterial = new MeshBasicMaterial( {
 			color: 'white',
@@ -424,6 +431,8 @@ class SSRPass extends Pass {
 		this.edgeVBlurRenderTarget3.dispose();
 		this.edgeVBlurRenderTarget4.dispose();
 		this.maskRenderTarget.dispose();
+		this.blankRenderTarget.dispose();
+		this.combineRenderTarget.dispose();
 
 		// dispose materials
 
@@ -437,6 +446,8 @@ class SSRPass extends Pass {
 		this.maskMaterial.dispose();
 		this.copyMaterial.dispose();
 		this.depthRenderMaterial.dispose();
+		this.blankMaterial.dispose();
+		this.combineMaterial.dispose();
 
 		// dipsose full screen quad
 
@@ -535,22 +546,22 @@ class SSRPass extends Pass {
 					this.renderPass( renderer, this.blankMaterial, this.blankRenderTarget );
 
 					
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 5. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 10. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.blankRenderTarget.texture;
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget3);
 
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 3. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 7. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget4);
 					
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 5. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 10. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget4.texture;
 					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget3);
 
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 3. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 7. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget3.texture;
 					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget4);
@@ -558,6 +569,22 @@ class SSRPass extends Pass {
 					this.combineMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
 					this.combineMaterial.uniforms[ 'tMask' ].value = this.edgeVBlurRenderTarget4.texture;
 					this.combineMaterial.uniforms[ 'tPlayer' ].value = this.playerRenderTarget.texture;
+					this.combineMaterial.uniforms[ 'resolution' ].value.set(
+						window.innerWidth * window.devicePixelRatio,
+						window.innerHeight * window.devicePixelRatio
+					);
+
+					const modelViewMatrix = new Matrix4().multiplyMatrices(this.camera.matrixWorldInverse, this.camera.matrixWorld);
+					this.combineMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
+					this.combineMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
+					this.combineMaterial.uniforms[ 'cameraProjectionMatrix' ].value.copy( this.camera.projectionMatrix );
+					this.combineMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse );
+					this.combineMaterial.uniforms[ 'cameraMatrixWorldInverse' ].value.copy( this.camera.matrixWorldInverse );
+					this.combineMaterial.uniforms[ 'uViewInverse' ].value.copy( modelViewMatrix );
+					this.combineMaterial.uniforms[ 'uMatrixWorld' ].value.copy( this.camera.matrixWorld );
+					
+					if(this.foamRenderTarget)
+						this.combineMaterial.uniforms[ 'tDepth' ].value = this.foamRenderTarget.texture;
 					this.renderPass( renderer, this.combineMaterial, this.combineRenderTarget);
 
 

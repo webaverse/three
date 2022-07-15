@@ -648,10 +648,20 @@ var BlankShader = {
 var CombineShader = {
 
 	uniforms: {
-
+		'time': { value: 0 },
 		'tDiffuse': { value: null },
 		'tMask': { value: null },
+		'tDepth': { value: null },
 		'tPlayer': { value: null },
+		'dudvMap': { value: null },
+		'cameraNear': { value: null },
+		'cameraFar': { value: null },
+		'resolution': { value: new Vector2()},
+		'cameraProjectionMatrix': { value: new Matrix4() },
+		'cameraInverseProjectionMatrix': { value: new Matrix4() },
+		'cameraMatrixWorldInverse': { value: new Matrix4() },
+		'uViewInverse': { value: new Matrix4() },
+		'uMatrixWorld': { value: new Matrix4() },
 		
 
 	},
@@ -659,31 +669,110 @@ var CombineShader = {
 	vertexShader: /* glsl */`
 
 		varying vec2 vUv;
+		varying vec3 vPos;
 
 		void main() {
 
 			vUv = uv;
+			vPos = position;
 			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+			
 
 		}
 
 	`,
 
 	fragmentShader: /* glsl */`
+	#include <common>
+	#include <packing>
+		uniform mat4 modelMatrix;
+		uniform mat4 cameraProjectionMatrix;
+		uniform mat4 cameraInverseProjectionMatrix;
+		uniform mat4 cameraMatrixWorldInverse;
+		uniform mat4 uViewInverse;
+		uniform mat4 uMatrixWorld;
+		
 
 		uniform sampler2D tDiffuse;
 		uniform sampler2D tMask;
 		uniform sampler2D tPlayer;
+		uniform sampler2D dudvMap;
+		uniform sampler2D tDepth;
+		uniform float cameraNear;
+        uniform float cameraFar;
+		uniform vec2 resolution;
+		uniform float time;
 
 		varying vec2 vUv;
+		varying vec3 vPos;
+
+		float linearize_depth(in float depth){
+			float a = cameraFar / (cameraFar - cameraNear);
+			float b = cameraFar * cameraNear / (cameraNear - cameraFar);
+			return a + b / depth;
+		}
+		
+		float reconstruct_depth(const in vec2 uv){
+			float depth = texture2D(tDepth, uv).x;
+			return pow(2.0, depth * log2(cameraFar + 1.0)) - 1.0;
+		}
+		
+		float getDepth(vec2 uv) {
+			#if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )
+				return linearize_depth(reconstruct_depth(uv));
+			#else
+				return texture2D(tDepth, uv).x;
+			#endif
+			// return unpackRGBAToDepth( texture2D( tDepth, uv ) );
+		}
+		float getViewZ( const in float depth ) {
+			#ifdef PERSPECTIVE_CAMERA
+				return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
+			#else
+				return orthographicDepthToViewZ( depth, cameraNear, cameraFar );
+			#endif
+		}
+		vec4 getViewPosition( const in vec2 uv, const in float depth/*clip space*/, const in float clipW ) {
+			vec4 clipPosition = vec4( ( vec3( uv, depth ) - 0.5 ) * 2.0, 1.0 );//ndc
+			clipPosition *= clipW; //clip
+			return ( cameraInverseProjectionMatrix * clipPosition ).xyzw;//view
+		}
 
 		void main() {
-
 			vec4 diffuse = texture2D( tDiffuse, vUv );
 			vec4 mask = texture2D( tMask, vUv );
 			vec4 player = texture2D( tPlayer, vUv );
-			if(mask.a > 0.1 && mask.r < 0.5 && player.r > 0.1){
-				gl_FragColor = vec4(0.0, 0., 0., 1.0);
+
+
+			// float depth = getDepth( vUv );
+			// float viewZ = getViewZ( depth );
+			// if(-viewZ >= cameraFar) return;
+			// float clipW = cameraProjectionMatrix[2][3] * viewZ + cameraProjectionMatrix[3][3];
+			// vec4 viewPosition = getViewPosition( vUv, depth, clipW );
+
+
+
+			float normalizedDepth = unpackRGBAToDepth(  texture2D( tDepth, vUv) ); 
+			vec4 ndc = vec4(
+				(vUv.x - 0.5) * 2.0,
+				(vUv.y - 0.5) * 2.0,
+				(normalizedDepth - 0.5) * 2.0,
+				1.0);
+			
+			vec4 clip = cameraInverseProjectionMatrix * ndc;
+			vec4 view = uMatrixWorld * (clip / clip.w);
+			vec3 worldPos = view.xyz;
+			
+
+			if(mask.a > 0.1 && player.r > 0.1){
+                float diff = mask.r;
+        
+                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 12. ) - time * 0.05 ).rg;
+                displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
+                diff += displacement.x;
+        
+                gl_FragColor.rgb = mix( vec3(1.0, 1.0, 1.0), diffuse.rgb, step( 0.15, diff ) );
+				gl_FragColor.a = diffuse.a;
 			}
 			else{
 				gl_FragColor = diffuse;
