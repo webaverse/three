@@ -32,9 +32,8 @@ var SSRShader = {
 		'opacity': { value: .5 },
 		'maxDistance': { value: 180 },
 		'cameraRange': { value: 0 },
-		'thickness': { value: .018 },
-		'uTime': { value: 0 },
-		'distortionTexture': { value: null }
+		'thickness': { value: .018 }
+
 	},
 
 	vertexShader: /* glsl */`
@@ -54,11 +53,7 @@ var SSRShader = {
 	fragmentShader: /* glsl */`
 		// precision highp float;
 		precision highp sampler2D;
-
-		uniform sampler2D distortionTexture;
-
 		varying vec2 vUv;
-		uniform float uTime;
 		uniform sampler2D tDepth;
 		uniform sampler2D tNormal;
 		uniform sampler2D tMetalness;
@@ -89,27 +84,9 @@ var SSRShader = {
 			float distance=(a*x0+b*y0+c*z0+d)/sqrt(a*a+b*b+c*c);
 			return distance;
 		}
-		float linearize_depth(in float depth){
-			float a = cameraFar / (cameraFar - cameraNear);
-			float b = cameraFar * cameraNear / (cameraNear - cameraFar);
-			return a + b / depth;
+		float getDepth( const in vec2 uv ) {
+			return texture2D( tDepth, uv ).x;
 		}
-		
-		float reconstruct_depth(const in vec2 uv){
-			float depth = texture2D(tDepth, uv).x;
-			return pow(2.0, depth * log2(cameraFar + 1.0)) - 1.0;
-		}
-		
-		float getDepth(vec2 uv) {
-			#if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )
-				return linearize_depth(reconstruct_depth(uv));
-			#else
-				return texture2D(tDepth, uv).x;
-			#endif
-		}
-		// float getDepth( const in vec2 uv ) {
-		// 	return texture2D( tDepth, uv ).x;
-		// }
 		float getViewZ( const in float depth ) {
 			#ifdef PERSPECTIVE_CAMERA
 				return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
@@ -135,46 +112,11 @@ var SSRShader = {
 			xy*=resolution;//screen
 			return xy;
 		}
-
-		float frac(float v){
-			return v - floor(v);
-		}
-		vec3 FlowUVW (vec2 uv, vec2 flowVector, vec2 jump, float flowOffset, float tiling, float time,  bool flowB) {
-			float phaseOffset = flowB ? 0.5 : 0.;
-			float progress = frac(time + phaseOffset);
-			vec3 uvw;
-			uvw.xy = uv - flowVector * (progress + flowOffset);
-			uvw.xy *= tiling;
-			uvw.xy += phaseOffset;
-			uvw.xy += (time - progress) * jump;
-			uvw.z = 1. - abs(1. - 2. * progress);
-			return uvw;
-		}
-
 		void main(){
 			#ifdef SELECTIVE
 				float metalness=texture2D(tMetalness,vUv).r;
 				if(metalness==0.) return;
 			#endif
-
-			// v1
-			vec3 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
-			vec3 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 30., vUv.y - uTime / 30.)).rgb) * 0.025;
-			vec3 reflectUv = distortion + distortion2;
-			reflectUv = clamp(reflectUv, 0.001, 0.999);
-
-			// v2
-			// vec2 flowmap = texture2D(distortionTexture, vUv / 20.).rg * 2. - 1.;
-			// flowmap *= 0.15;
-			// float noise = texture2D(distortionTexture, vUv).a;
-			// float time = uTime * 1. + noise;
-			// vec2 jump = vec2(0.24, 0.208);
-			// vec3 uvwA = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, false);
-			// vec3 uvwB = FlowUVW(vUv, flowmap, jump, -1.5, 2., time, true);
-
-			// vec2 texA = (texture2D(distortionTexture, uvwA.xy) * uvwA.z).rg;
-            // vec2 texB = (texture2D(distortionTexture, uvwB.xy) * uvwB.z).rg;
-			// vec2 reflectUv = (vUv + texA.rg + texB.rg) * 0.5;
 
 			float depth = getDepth( vUv );
 			float viewZ = getViewZ( depth );
@@ -186,8 +128,8 @@ var SSRShader = {
 			vec2 d0=gl_FragCoord.xy;
 			vec2 d1;
 
-			vec3 viewNormal=getViewNormal( vUv ) + reflectUv;
-			viewNormal.y = abs(viewNormal.y);
+			vec3 viewNormal=getViewNormal( vUv );
+
 			#ifdef PERSPECTIVE_CAMERA
 				vec3 viewIncidentDir=normalize(viewPosition);
 				vec3 viewReflectDir=reflect(viewIncidentDir,viewNormal);
@@ -277,8 +219,6 @@ var SSRShader = {
 							float fresnelCoe=(dot(viewIncidentDir,viewReflectDir)+1.)/2.;
 							op*=fresnelCoe;
 						#endif
-						
-
 						vec4 reflectColor=texture2D(tDiffuse,uv);
 						gl_FragColor.xyz=reflectColor.xyz;
 						gl_FragColor.a=op;
@@ -395,7 +335,7 @@ var SSRBlurShader = {
 
 			vec2 offset;
 
-			offset=(vec2(-1,0))*texelSize * 20.;
+			offset=(vec2(-1,0))*texelSize;
 			vec4 cl=texture2D(tDiffuse,vUv+offset);
 
 			offset=(vec2(1,0))*texelSize;
@@ -421,367 +361,4 @@ var SSRBlurShader = {
 
 };
 
-var EdgeHBlurShader = {
-
-	uniforms: {
-
-		'tDiffuse': { value: null },
-		'tMask': { value: null },
-		'h': { value: 0 },
-
-	},
-
-	vertexShader: /* glsl */`
-
-		varying vec2 vUv;
-
-		void main() {
-
-			vUv = uv;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-
-		uniform sampler2D tDiffuse;
-		uniform sampler2D tMask;
-		uniform float h;
-		varying vec2 vUv;
-		void main() {
-
-			vec4 sum = vec4( 0.0 );
-			vec2 uv;
-			float mask;
-			
-			uv = vec2( vUv.x - 4.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
-			
-			uv = vec2( vUv.x - 3.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
-			
-			uv = vec2( vUv.x - 2.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
-			
-			uv = vec2( vUv.x - 1.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
-			
-			uv = vec2( vUv.x, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.1633 * mask;
-			
-			uv = vec2( vUv.x + 1.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
-			
-			uv = vec2( vUv.x + 2.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
-			
-			uv = vec2( vUv.x + 3.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
-			
-			uv = vec2( vUv.x + 4.0 * h, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
-
-			gl_FragColor = sum;
-
-		}
-	`
-
-
-};
-
-var EdgeVBlurShader = {
-
-	uniforms: {
-
-		'tDiffuse': { value: null },
-		'tMask': { value: null },
-		'v': { value: 0 },
-
-	},
-
-	vertexShader: /* glsl */`
-
-		varying vec2 vUv;
-
-		void main() {
-
-			vUv = uv;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-
-		uniform sampler2D tDiffuse;
-		uniform sampler2D tMask;
-		uniform float v;
-
-		varying vec2 vUv;
-
-		void main() {
-
-			vec4 sum = vec4( 0.0 );
-			vec2 uv;
-			float mask;
-			
-			uv = vec2( vUv.x, vUv.y - 4.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
-			
-			uv = vec2( vUv.x, vUv.y - 3.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
-			
-			uv = vec2( vUv.x, vUv.y - 2.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
-			
-			uv = vec2( vUv.x, vUv.y - 1.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
-			
-			uv = vec2( vUv.x, vUv.y );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.1633 * mask;
-			
-			uv = vec2( vUv.x, vUv.y + 1.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.1531 * mask;
-			
-			uv = vec2( vUv.x, vUv.y + 2.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.12245 * mask;
-			
-			uv = vec2( vUv.x, vUv.y + 3.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.0918 * mask;
-			
-			uv = vec2( vUv.x, vUv.y + 4.0 * v );
-			mask = texture2D( tMask, uv ).r;
-			sum += texture2D( tDiffuse, uv ) * 0.051 * mask;
-
-			gl_FragColor = sum;
-
-		}
-	`
-
-
-};
-
-var MaskShader = {
-
-	uniforms: {
-
-		'tDiffuse': { value: null },
-		'tMask': { value: null },
-
-	},
-
-	vertexShader: /* glsl */`
-
-		varying vec2 vUv;
-
-		void main() {
-
-			vUv = uv;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-
-		uniform sampler2D tDiffuse;
-		uniform sampler2D tMask;
-
-		varying vec2 vUv;
-
-		void main() {
-
-			vec4 diffuse = texture2D( tDiffuse, vUv );
-			float mask = texture2D( tMask, vUv ).r;
-
-			float fadeSpan = 0.3;
-			float leftFade = 1. - vUv.x / fadeSpan;
-			float rightFade = (vUv.x - (1. - fadeSpan)) / fadeSpan;
-
-			gl_FragColor.rgb = diffuse.rgb;
-			gl_FragColor.a = min(mask, max(leftFade, rightFade));
-			// gl_FragColor.a = 1. - gl_FragColor.r;
-
-		}
-	`
-
-
-};
-var BlankShader = {
-	vertexShader: /* glsl */`
-		void main() {
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-		void main() {
-			gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-		}
-	`
-
-
-};
-
-var CombineShader = {
-
-	uniforms: {
-		'time': { value: 0 },
-		'tDiffuse': { value: null },
-		'tMask': { value: null },
-		'tDepth': { value: null },
-		'tPlayer': { value: null },
-		'dudvMap': { value: null },
-		'cameraNear': { value: null },
-		'cameraFar': { value: null },
-		'resolution': { value: new Vector2()},
-		'cameraProjectionMatrix': { value: new Matrix4() },
-		'cameraInverseProjectionMatrix': { value: new Matrix4() },
-		'cameraMatrixWorldInverse': { value: new Matrix4() },
-		'uViewInverse': { value: new Matrix4() },
-		'uMatrixWorld': { value: new Matrix4() },
-		
-
-	},
-
-	vertexShader: /* glsl */`
-
-		varying vec2 vUv;
-		varying vec3 vPos;
-
-		void main() {
-
-			vUv = uv;
-			vPos = position;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-			
-
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-	#include <common>
-	#include <packing>
-		uniform mat4 modelMatrix;
-		uniform mat4 cameraProjectionMatrix;
-		uniform mat4 cameraInverseProjectionMatrix;
-		uniform mat4 cameraMatrixWorldInverse;
-		uniform mat4 uViewInverse;
-		uniform mat4 uMatrixWorld;
-		
-
-		uniform sampler2D tDiffuse;
-		uniform sampler2D tMask;
-		uniform sampler2D tPlayer;
-		uniform sampler2D dudvMap;
-		uniform sampler2D tDepth;
-		uniform float cameraNear;
-        uniform float cameraFar;
-		uniform vec2 resolution;
-		uniform float time;
-
-		varying vec2 vUv;
-		varying vec3 vPos;
-
-		float linearize_depth(in float depth){
-			float a = cameraFar / (cameraFar - cameraNear);
-			float b = cameraFar * cameraNear / (cameraNear - cameraFar);
-			return a + b / depth;
-		}
-		
-		float reconstruct_depth(const in vec2 uv){
-			float depth = texture2D(tDepth, uv).x;
-			return pow(2.0, depth * log2(cameraFar + 1.0)) - 1.0;
-		}
-		
-		float getDepth(vec2 uv) {
-			#if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )
-				return linearize_depth(reconstruct_depth(uv));
-			#else
-				return texture2D(tDepth, uv).x;
-			#endif
-			// return unpackRGBAToDepth( texture2D( tDepth, uv ) );
-		}
-		float getViewZ( const in float depth ) {
-			#ifdef PERSPECTIVE_CAMERA
-				return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
-			#else
-				return orthographicDepthToViewZ( depth, cameraNear, cameraFar );
-			#endif
-		}
-		vec4 getViewPosition( const in vec2 uv, const in float depth/*clip space*/, const in float clipW ) {
-			vec4 clipPosition = vec4( ( vec3( uv, depth ) - 0.5 ) * 2.0, 1.0 );//ndc
-			clipPosition *= clipW; //clip
-			return ( cameraInverseProjectionMatrix * clipPosition ).xyzw;//view
-		}
-
-		void main() {
-			vec4 diffuse = texture2D( tDiffuse, vUv );
-			vec4 mask = texture2D( tMask, vUv );
-			vec4 player = texture2D( tPlayer, vUv );
-
-
-			// float depth = getDepth( vUv );
-			// float viewZ = getViewZ( depth );
-			// if(-viewZ >= cameraFar) return;
-			// float clipW = cameraProjectionMatrix[2][3] * viewZ + cameraProjectionMatrix[3][3];
-			// vec4 viewPosition = getViewPosition( vUv, depth, clipW );
-
-
-
-			float normalizedDepth = unpackRGBAToDepth(  texture2D( tDepth, vUv) ); 
-			vec4 ndc = vec4(
-				(vUv.x - 0.5) * 2.0,
-				(vUv.y - 0.5) * 2.0,
-				(normalizedDepth - 0.5) * 2.0,
-				1.0);
-
-			
-			vec4 clip = cameraInverseProjectionMatrix * ndc;
-			vec4 view = uMatrixWorld * (clip / clip.w);
-			vec3 worldPos = view.xyz;
-			
-
-			if(mask.a > 0.1 && mask.r < 1. && player.r > 0.1){
-                float diff = mask.r;
-        
-                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 10. ) - time * 0.05 ).rg;
-                displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
-                diff += displacement.x;
-        
-                gl_FragColor = mix( vec4(1.0, 1.0, 1.0, diffuse.a), diffuse, step( 0.5, diff ) );
-				// gl_FragColor.a = diffuse.a;
-			}
-			else{
-				gl_FragColor = diffuse;
-			}
-		}
-	`
-
-
-};
-
-export { SSRShader, SSRDepthShader, SSRBlurShader, EdgeHBlurShader, EdgeVBlurShader, MaskShader, BlankShader, CombineShader };
+export { SSRShader, SSRDepthShader, SSRBlurShader };
