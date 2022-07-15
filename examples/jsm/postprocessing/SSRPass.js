@@ -19,7 +19,7 @@ import {
 import { Pass, FullScreenQuad } from '../postprocessing/Pass.js';
 import { SSRShader } from '../shaders/SSRShader.js';
 import { SSRBlurShader } from '../shaders/SSRShader.js';
-import { EdgeHBlurShader, EdgeVBlurShader, MaskShader } from '../shaders/SSRShader.js';
+import { EdgeHBlurShader, EdgeVBlurShader, MaskShader, BlankShader, CombineShader } from '../shaders/SSRShader.js';
 import { SSRDepthShader } from '../shaders/SSRShader.js';
 import { CopyShader } from '../shaders/CopyShader.js';
 import { DoubleSide } from 'three';
@@ -205,8 +205,6 @@ class SSRPass extends Pass {
 			format: RGBAFormat
 		} );
 
-
-
 		// ssr render target
 
 		this.ssrRenderTarget = new WebGLRenderTarget( this.width, this.height, {
@@ -220,8 +218,12 @@ class SSRPass extends Pass {
 		// this.blurRenderTarget3 = this.ssrRenderTarget.clone();
 		this.edgeHBlurRenderTarget = this.ssrRenderTarget.clone();
 		this.edgeHBlurRenderTarget2 = this.ssrRenderTarget.clone();
+		this.edgeHBlurRenderTarget3 = this.ssrRenderTarget.clone();
+		this.edgeHBlurRenderTarget4 = this.ssrRenderTarget.clone();
 		this.edgeVBlurRenderTarget = this.ssrRenderTarget.clone();
 		this.edgeVBlurRenderTarget2 = this.ssrRenderTarget.clone();
+		this.edgeVBlurRenderTarget3 = this.ssrRenderTarget.clone();
+		this.edgeVBlurRenderTarget4 = this.ssrRenderTarget.clone();
 		this.maskRenderTarget = this.ssrRenderTarget.clone();
 
 
@@ -332,6 +334,7 @@ class SSRPass extends Pass {
 			vertexShader: MaskShader.vertexShader,
 			fragmentShader: MaskShader.fragmentShader
 		} );
+		
 
 		// material for rendering the depth
 
@@ -368,6 +371,36 @@ class SSRPass extends Pass {
 
 		this.originalClearColor = new Color();
 
+		this.blankMaterial  = new ShaderMaterial( {
+			defines: Object.assign( {}, BlankShader.defines ),
+			uniforms: UniformsUtils.clone( BlankShader.uniforms ),
+			vertexShader: BlankShader.vertexShader,
+			fragmentShader: BlankShader.fragmentShader
+		} );
+		this.blankRenderTarget = this.ssrRenderTarget.clone();
+
+		this.combineMaterial  = new ShaderMaterial( {
+			defines: Object.assign( {}, CombineShader.defines ),
+			uniforms: UniformsUtils.clone( CombineShader.uniforms ),
+			vertexShader: CombineShader.vertexShader,
+			fragmentShader: CombineShader.fragmentShader
+		} );
+		this.combineRenderTarget = this.ssrRenderTarget.clone();
+
+		this.playerOnMaterial = new MeshBasicMaterial( {
+			color: 'white',
+			side: DoubleSide,
+		} );
+		this.playerOffMaterial = new MeshBasicMaterial( {
+			color: 'black',
+			side: DoubleSide,
+		} );
+		this.playerRenderTarget = new WebGLRenderTarget( this.width, this.height, {
+			minFilter: NearestFilter,
+			magFilter: NearestFilter,
+			format: RGBAFormat
+		} );
+
 	}
 
 	dispose() {
@@ -384,8 +417,12 @@ class SSRPass extends Pass {
 		// this.blurRenderTarget3.dispose();
 		this.edgeHBlurRenderTarget.dispose();
 		this.edgeHBlurRenderTarget2.dispose();
+		this.edgeHBlurRenderTarget3.dispose();
+		this.edgeHBlurRenderTarget4.dispose();
 		this.edgeVBlurRenderTarget.dispose();
 		this.edgeVBlurRenderTarget2.dispose();
+		this.edgeVBlurRenderTarget3.dispose();
+		this.edgeVBlurRenderTarget4.dispose();
 		this.maskRenderTarget.dispose();
 
 		// dispose materials
@@ -409,24 +446,6 @@ class SSRPass extends Pass {
 
 	render( renderer, writeBuffer, readBuffer /*, deltaTime, maskActive */ ) {
 
-		
-		// console.log('selective',this.selective)
-
-		// render beauty and depth
-
-		// renderer.setRenderTarget( this.beautyRenderTarget );
-		// renderer.clear();
-		// if ( this.groundReflector ) {
-
-		// 	this.groundReflector.visible = false;
-		// 	this.groundReflector.doRender( this.renderer, this.scene, this.camera );
-		// 	this.groundReflector.visible = true;
-
-		// }
-
-		// renderer.render( this.scene, this.camera );
-		// if ( this.groundReflector ) this.groundReflector.visible = false;
-
 		// render normals
 
 		this.renderOverride( renderer, this.normalMaterial, this.normalRenderTarget, 0, 0 );
@@ -436,6 +455,9 @@ class SSRPass extends Pass {
 		if ( this.selective ) {
 			this.renderMetalness( renderer, this.metalnessOnMaterial, this.metalnessRenderTarget, 0, 0 );
 		}
+
+		
+
 		// render SSR
 
 		this.ssrMaterial.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
@@ -444,21 +466,13 @@ class SSRPass extends Pass {
 		this.ssrMaterial.uniforms[ 'thickness' ].value = this.thickness;
 		this.renderPass( renderer, this.ssrMaterial, this.ssrRenderTarget );
 
-
 		// render blur
 
 		if ( this.blur ) {
-
 			this.renderPass( renderer, this.blurMaterial, this.blurRenderTarget );
 			this.renderPass( renderer, this.blurMaterial2, this.blurRenderTarget2 );
 			// this.renderPass(renderer, this.blurMaterial3, this.blurRenderTarget3);
-			
 		}
-		// output result to screen
-		// this.edgeHBlurMaterial.uniforms[ 'h' ].value = 15 *  1 / this.width;
-		// this.edgeHBlurMaterial.uniforms[ 'v' ].value = 15 *  1 / this.height;
-		// this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget);
-		
 
 		switch ( this.output ) {
 
@@ -492,21 +506,22 @@ class SSRPass extends Pass {
 					this.copyMaterial.blending = NormalBlending;
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 
-					
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 5. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 15. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = writeBuffer.texture;
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget);
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 3. * 1.0 / window.innerWidth * window.devicePixelRatio;
+
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 13. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget.texture;
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget2);
 					
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 5. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 15. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget2.texture;
 					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget);
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 3. * 1.0 / window.innerHeight * window.devicePixelRatio;
+
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 13. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget.texture;
 					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget2);
@@ -515,7 +530,38 @@ class SSRPass extends Pass {
 					this.maskMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.maskMaterial, this.maskRenderTarget);
 
-					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
+					
+
+					this.renderPass( renderer, this.blankMaterial, this.blankRenderTarget );
+
+					
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 5. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.blankRenderTarget.texture;
+					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget3);
+
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 3. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
+					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget4);
+					
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 5. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget4.texture;
+					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget3);
+
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 3. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget3.texture;
+					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget4);
+					
+					this.combineMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
+					this.combineMaterial.uniforms[ 'tMask' ].value = this.edgeVBlurRenderTarget4.texture;
+					this.combineMaterial.uniforms[ 'tPlayer' ].value = this.playerRenderTarget.texture;
+					this.renderPass( renderer, this.combineMaterial, this.combineRenderTarget);
+
+
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.combineRenderTarget.texture;
 					this.copyMaterial.blending = NormalBlending;
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 					
@@ -762,12 +808,71 @@ class SSRPass extends Pass {
 			}
 
 		} );
+		for(const invisibleSelect of this.invisibleSelects){
+			invisibleSelect.visible = false; 
+		}
+		renderer.render( this.scene, this.camera );
+		for(const invisibleSelect of this.invisibleSelects){
+				
+			invisibleSelect.visible = true; 
+		}
+		this.scene.traverseVisible( child => {
+
+			child.material = child._SSRPassBackupMaterial;
+
+		} );
+		
+
+		// restore original state
+
+		renderer.autoClear = originalAutoClear;
+		renderer.setClearColor( this.originalClearColor );
+		renderer.setClearAlpha( originalClearAlpha );
+
+		this.renderPlayer( renderer, this.playerOnMaterial, this.playerRenderTarget, 0, 0 );
+
+	}
+	renderPlayer( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
+
+		this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
+		const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
+		const originalAutoClear = renderer.autoClear;
+
+		renderer.setRenderTarget( renderTarget );
+		renderer.autoClear = false;
+
+		clearColor = overrideMaterial.clearColor || clearColor;
+		clearAlpha = overrideMaterial.clearAlpha || clearAlpha;
+
+		if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
+
+			renderer.setClearColor( clearColor );
+			renderer.setClearAlpha( clearAlpha || 0.0 );
+			renderer.clear();
+
+		}
+
+		this.scene.traverseVisible( child => {
+
+			child._SSRPassBackupMaterial = child.material;
+			if ( this._selects.includes( child ) ) {
+
+				child.material = this.playerOnMaterial;
+
+			} else {
+
+				child.material = this.playerOffMaterial;
+
+			}
+
+		} );
 		renderer.render( this.scene, this.camera );
 		this.scene.traverseVisible( child => {
 
 			child.material = child._SSRPassBackupMaterial;
 
 		} );
+		
 
 		// restore original state
 
@@ -776,6 +881,7 @@ class SSRPass extends Pass {
 		renderer.setClearAlpha( originalClearAlpha );
 
 	}
+	
 
 	setSize( width, height ) {
 

@@ -621,11 +621,77 @@ var MaskShader = {
 
 			gl_FragColor.rgb = diffuse.rgb;
 			gl_FragColor.a = min(mask, max(leftFade, rightFade));
+			// gl_FragColor.a = 1. - gl_FragColor.r;
 
 		}
 	`
 
 
 };
+var BlankShader = {
+	vertexShader: /* glsl */`
+		void main() {
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}
 
-export { SSRShader, SSRDepthShader, SSRBlurShader, EdgeHBlurShader, EdgeVBlurShader, MaskShader };
+	`,
+
+	fragmentShader: /* glsl */`
+		void main() {
+			gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+		}
+	`
+
+
+};
+
+var CombineShader = {
+
+	uniforms: {
+
+		'tDiffuse': { value: null },
+		'tMask': { value: null },
+		'tPlayer': { value: null },
+		
+
+	},
+
+	vertexShader: /* glsl */`
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}
+
+	`,
+
+	fragmentShader: /* glsl */`
+
+		uniform sampler2D tDiffuse;
+		uniform sampler2D tMask;
+		uniform sampler2D tPlayer;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vec4 diffuse = texture2D( tDiffuse, vUv );
+			vec4 mask = texture2D( tMask, vUv );
+			vec4 player = texture2D( tPlayer, vUv );
+			if(mask.a > 0.1 && mask.r < 0.5 && player.r > 0.1){
+				gl_FragColor = vec4(0.0, 0., 0., 1.0);
+			}
+			else{
+				gl_FragColor = diffuse;
+			}
+		}
+	`
+
+
+};
+
+export { SSRShader, SSRDepthShader, SSRBlurShader, EdgeHBlurShader, EdgeVBlurShader, MaskShader, BlankShader, CombineShader };
