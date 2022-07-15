@@ -716,7 +716,7 @@ var WebaWaterCombineShader = {
 			if(mask.a > 0.1 && mask.r < 1. && player.r > 0.1){
                 float diff = mask.r;
         
-                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 5. ) - time * 0.05 ).rg;
+                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 10. ) - time * 0.05 ).rg;
                 displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
                 diff += displacement.x;
         
