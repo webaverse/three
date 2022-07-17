@@ -158,8 +158,8 @@ var WebaWaterSSRShader = {
 			#endif
 
 			// v1
-			vec3 distortion = (texture2D(distortionTexture, vec2(vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
-			vec3 distortion2 = (texture2D(distortionTexture, vec2(-vUv.x - uTime / 30., vUv.y - uTime / 30.)).rgb) * 0.025;
+			vec3 distortion = (texture2D(distortionTexture, vec2(0.5 * vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
+			vec3 distortion2 = (texture2D(distortionTexture, vec2(0.3 * -vUv.x - uTime / 30., 0.1 * vUv.y - uTime / 30.)).rgb) * 0.025;
 			vec3 reflectUv = distortion + distortion2;
 			reflectUv = clamp(reflectUv, 0.001, 0.999);
 
@@ -715,8 +715,12 @@ var WebaWaterCombineShader = {
 
 			if(mask.a > 0.1 && mask.r < 1. && player.r > 0.1){
                 float diff = mask.r;
-        
-                vec2 displacement = texture2D( dudvMap, ( worldPos.xz * 0.05 * 10. ) - time * 0.05 ).rg;
+
+
+				vec2 channelA = texture2D( dudvMap, vec2(0.25 * worldPos.x + time * 0.08, 0.5 * worldPos.z - time * 0.05) ).rg;
+				vec2 channelB = texture2D( dudvMap, vec2(0.5 * worldPos.x - time * 0.07, 0.35 * worldPos.z + time * 0.06) ).rg;
+
+                vec2 displacement = (channelA + channelB) * 0.5;
                 displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
                 diff += displacement.x;
         
