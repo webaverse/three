@@ -491,7 +491,7 @@ class WebaWaterPass extends Pass {
 					this.copyMaterial.blending = NormalBlending;
 					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 15. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 20. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = writeBuffer.texture;
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget);
@@ -501,7 +501,7 @@ class WebaWaterPass extends Pass {
 					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget2);
 					
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 15. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 20. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget2.texture;
 					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget);
@@ -515,49 +515,52 @@ class WebaWaterPass extends Pass {
 					this.maskMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					this.renderPass( renderer, this.maskMaterial, this.maskRenderTarget);
 
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
+					this.copyMaterial.blending = NormalBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 					
 
-					this.renderPass( renderer, this.blankMaterial, this.blankRenderTarget );
+					// this.renderPass( renderer, this.blankMaterial, this.blankRenderTarget );
 
 					
-					this.edgeHBlurMaterial.uniforms[ 'h' ].value = 20. * 1.0 / window.innerWidth * window.devicePixelRatio;
-					this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.blankRenderTarget.texture;
-					this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
-					this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget3);
+					// this.edgeHBlurMaterial.uniforms[ 'h' ].value = 10. * 1.0 / window.innerWidth * window.devicePixelRatio;
+					// this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.blankRenderTarget.texture;
+					// this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					// this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget3);
 
 					// this.edgeHBlurMaterial.uniforms[ 'h' ].value = 7. * 1.0 / window.innerWidth * window.devicePixelRatio;
 					// this.edgeHBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
 					// this.edgeHBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					// this.renderPass( renderer, this.edgeHBlurMaterial, this.edgeHBlurRenderTarget4);
 					
-					this.edgeVBlurMaterial.uniforms[ 'v' ].value = 1. * 1.0 / window.innerHeight * window.devicePixelRatio;
-					this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
-					this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
-					this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget3);
+					// this.edgeVBlurMaterial.uniforms[ 'v' ].value = 1. * 1.0 / window.innerHeight * window.devicePixelRatio;
+					// this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeHBlurRenderTarget3.texture;
+					// this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
+					// this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget3);
 
 					// this.edgeVBlurMaterial.uniforms[ 'v' ].value = 7. * 1.0 / window.innerHeight * window.devicePixelRatio;
 					// this.edgeVBlurMaterial.uniforms[ 'tDiffuse' ].value = this.edgeVBlurRenderTarget3.texture;
 					// this.edgeVBlurMaterial.uniforms[ 'tMask' ].value = this.metalnessRenderTarget.texture;
 					// this.renderPass( renderer, this.edgeVBlurMaterial, this.edgeVBlurRenderTarget4);
 					
-					this.combineMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
-					this.combineMaterial.uniforms[ 'tMask' ].value = this.edgeVBlurRenderTarget3.texture;
-					this.combineMaterial.uniforms[ 'tPlayer' ].value = this.playerRenderTarget.texture;
-					this.combineMaterial.uniforms[ 'resolution' ].value.set(
-						window.innerWidth * window.devicePixelRatio,
-						window.innerHeight * window.devicePixelRatio
-					);
-					this.combineMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse );
-					this.combineMaterial.uniforms[ 'uMatrixWorld' ].value.copy( this.camera.matrixWorld );
+					// this.combineMaterial.uniforms[ 'tDiffuse' ].value = this.maskRenderTarget.texture;
+					// this.combineMaterial.uniforms[ 'tMask' ].value = this.edgeVBlurRenderTarget3.texture;
+					// this.combineMaterial.uniforms[ 'tPlayer' ].value = this.playerRenderTarget.texture;
+					// this.combineMaterial.uniforms[ 'resolution' ].value.set(
+					// 	window.innerWidth * window.devicePixelRatio,
+					// 	window.innerHeight * window.devicePixelRatio
+					// );
+					// this.combineMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse );
+					// this.combineMaterial.uniforms[ 'uMatrixWorld' ].value.copy( this.camera.matrixWorld );
 					
-					if(this.foamRenderTarget)
-						this.combineMaterial.uniforms[ 'tDepth' ].value = this.foamRenderTarget.texture;
-					this.renderPass( renderer, this.combineMaterial, this.combineRenderTarget);
+					// if(this.foamRenderTarget)
+					// 	this.combineMaterial.uniforms[ 'tDepth' ].value = this.foamRenderTarget.texture;
+					// this.renderPass( renderer, this.combineMaterial, this.combineRenderTarget);
 
 
-					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.combineRenderTarget.texture;
-					this.copyMaterial.blending = NormalBlending;
-					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					// this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.combineRenderTarget.texture;
+					// this.copyMaterial.blending = NormalBlending;
+					// this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
 					
 				}
 
