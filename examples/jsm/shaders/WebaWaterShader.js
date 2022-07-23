@@ -395,7 +395,7 @@ var WebaWaterSSRBlurShader = {
 
 			vec2 offset;
 
-			offset=(vec2(-1,0))*texelSize * 20.;
+			offset=(vec2(-1,0))*texelSize;
 			vec4 cl=texture2D(tDiffuse,vUv+offset);
 
 			offset=(vec2(1,0))*texelSize;
