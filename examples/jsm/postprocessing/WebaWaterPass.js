@@ -21,13 +21,13 @@ import {
 import { Pass, FullScreenQuad } from '../postprocessing/Pass.js';
 import { WebaWaterSSRShader } from '../shaders/WebaWaterShader.js';
 import { WebaWaterSSRBlurShader } from '../shaders/WebaWaterShader.js';
-import { WebaWaterEdgeHBlurShader, WebaWaterEdgeVBlurShader, WebaWaterMaskShader, WebaWaterBlankShader, WebaWaterCombineShader } from '../shaders/WebaWaterShader.js';
+import { WebaWaterEdgeHBlurShader, WebaWaterEdgeVBlurShader, WebaWaterMaskShader} from '../shaders/WebaWaterShader.js';
 import { CopyShader } from '../shaders/CopyShader.js';
 import { DoubleSide } from 'three';
 
 class WebaWaterPass extends Pass {
 
-	constructor( { renderer, scene, camera, width, height, selects, bouncing = false, invisibleSelects } ) {
+	constructor( { renderer, scene, camera, width, height, selects, bouncing = false} ) {
 
 		super();
 
@@ -47,28 +47,6 @@ class WebaWaterPass extends Pass {
 		this.thickness = WebaWaterSSRShader.uniforms.thickness.value;
 
 		this.tempColor = new Color();
-
-		// this.foamDepthMaterial = foamDepthMaterial;
-		// this.foamRenderTarget = foamRenderTarget;
-
-		const pixelRatio = renderer.getPixelRatio();
-		this.foamRenderTarget = new WebGLRenderTarget(
-			window.innerWidth * pixelRatio,
-			window.innerHeight * pixelRatio
-		);
-		this.foamRenderTarget.texture.minFilter = NearestFilter;
-		this.foamRenderTarget.texture.magFilter = NearestFilter;
-		this.foamRenderTarget.texture.generateMipmaps = false;
-		this.foamRenderTarget.stencilBuffer = false;
-
-		
-
-		this.foamDepthMaterial = new MeshDepthMaterial();
-		this.foamDepthMaterial.depthPacking = RGBADepthPacking;
-		this.foamDepthMaterial.blending = NoBlending;
-
-
-		this.invisibleSelects = invisibleSelects;
 
 		this._selects = selects;
 		this.selective = Array.isArray( this._selects );
@@ -351,42 +329,6 @@ class WebaWaterPass extends Pass {
 
 		this.originalClearColor = new Color();
 
-		this.blankMaterial  = new ShaderMaterial( {
-			defines: Object.assign( {}, WebaWaterBlankShader.defines ),
-			uniforms: UniformsUtils.clone( WebaWaterBlankShader.uniforms ),
-			vertexShader: WebaWaterBlankShader.vertexShader,
-			fragmentShader: WebaWaterBlankShader.fragmentShader
-		} );
-		this.blankRenderTarget = this.ssrRenderTarget.clone();
-
-		this.combineMaterial  = new ShaderMaterial( {
-			defines: Object.assign( {}, WebaWaterCombineShader.defines ),
-			uniforms: UniformsUtils.clone( WebaWaterCombineShader.uniforms ),
-			vertexShader: WebaWaterCombineShader.vertexShader,
-			fragmentShader: WebaWaterCombineShader.fragmentShader,
-		} );
-		this.combineRenderTarget = this.ssrRenderTarget.clone();
-		// this.combineMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
-		// this.combineMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
-		// this.combineMaterial.uniforms[ 'cameraProjectionMatrix' ].value.copy( this.camera.projectionMatrix );
-		// this.combineMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse );
-		// this.combineMaterial.uniforms[ 'cameraMatrixWorldInverse' ].value.copy( this.camera.matrixWorldInverse );
-		
-
-		this.playerOnMaterial = new MeshBasicMaterial( {
-			color: 'white',
-			side: DoubleSide,
-		} );
-		this.playerOffMaterial = new MeshBasicMaterial( {
-			color: 'black',
-			side: DoubleSide,
-		} );
-		this.playerRenderTarget = new WebGLRenderTarget( this.width, this.height, {
-			minFilter: NearestFilter,
-			magFilter: NearestFilter,
-			format: RGBAFormat
-		} );
-
 	}
 
 	dispose() {
@@ -620,45 +562,6 @@ class WebaWaterPass extends Pass {
 				console.warn( 'THREE.WebaWaterPass: Unknown output type.' );
 
 		}
-		if(this.foamDepthMaterial && this.foamRenderTarget){
-
-            this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
-            const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
-            const originalAutoClear = renderer.autoClear;
-
-            renderer.setRenderTarget(this.foamRenderTarget);
-            renderer.autoClear = false;
-
-            const clearColor = this.foamDepthMaterial.clearColor || 0;
-            const clearAlpha = this.foamDepthMaterial.clearAlpha || 0;
-
-            if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
-
-                renderer.setClearColor( clearColor );
-                renderer.setClearAlpha( clearAlpha || 0.0 );
-                renderer.clear();
-
-            }
-
-			for(const invisibleSelect of this.invisibleSelects){
-				
-				invisibleSelect.visible = false; 
-			}
-            this.scene.overrideMaterial = this.foamDepthMaterial;
-      
-            // renderer.setRenderTarget(this.renderTarget);
-            renderer.render(this.scene, this.camera);
-            renderer.setRenderTarget(null);
-      
-            this.scene.overrideMaterial = null;
-			for(const invisibleSelect of this.invisibleSelects){
-				invisibleSelect.visible = true; 
-			}
-
-            renderer.autoClear = originalAutoClear;
-            renderer.setClearColor( this.originalClearColor );
-            renderer.setClearAlpha( originalClearAlpha );
-        }
 
 	}
 
@@ -800,69 +703,11 @@ class WebaWaterPass extends Pass {
 			}
 
 		} );
-		for(const invisibleSelect of this.invisibleSelects){
-			invisibleSelect.visible = false; 
-		}
-		renderer.render( this.scene, this.camera );
-		for(const invisibleSelect of this.invisibleSelects){
-				
-			invisibleSelect.visible = true; 
-		}
-		this.scene.traverseVisible( child => {
-
-			child.material = child._WebaWaterPassBackupMaterial;
-
-		} );
 		
-
-		// restore original state
-
-		renderer.autoClear = originalAutoClear;
-		renderer.setClearColor( this.originalClearColor );
-		renderer.setClearAlpha( originalClearAlpha );
-
-		this.renderPlayer( renderer, this.playerOnMaterial, this.playerRenderTarget, 0, 0 );
-
-	}
-	renderPlayer( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
-
-		this.originalClearColor.copy( renderer.getClearColor( this.tempColor ) );
-		const originalClearAlpha = renderer.getClearAlpha( this.tempColor );
-		const originalAutoClear = renderer.autoClear;
-
-		renderer.setRenderTarget( renderTarget );
-		renderer.autoClear = false;
-
-		clearColor = overrideMaterial.clearColor || clearColor;
-		clearAlpha = overrideMaterial.clearAlpha || clearAlpha;
-
-		if ( ( clearColor !== undefined ) && ( clearColor !== null ) ) {
-
-			renderer.setClearColor( clearColor );
-			renderer.setClearAlpha( clearAlpha || 0.0 );
-			renderer.clear();
-
-		}
-
-		this.scene.traverseVisible( child => {
-
-			child._WebaWaterPassBackupMaterial = child.material;
-			if ( this._selects.includes( child ) ) {
-
-				child.material = this.playerOnMaterial;
-
-			} else {
-
-				child.material = this.playerOffMaterial;
-
-			}
-
-		} );
 		renderer.render( this.scene, this.camera );
+		
 		this.scene.traverseVisible( child => {
-
 			child.material = child._WebaWaterPassBackupMaterial;
-
 		} );
 		
 
