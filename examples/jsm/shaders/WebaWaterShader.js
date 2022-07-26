@@ -158,10 +158,10 @@ var WebaWaterSSRShader = {
 			#endif
 
 			// v1
-			vec3 distortion = (texture2D(distortionTexture, vec2(0.5 * vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
-			vec3 distortion2 = (texture2D(distortionTexture, vec2(0.3 * -vUv.x - uTime / 30., 0.1 * vUv.y - uTime / 30.)).rgb) * 0.025;
+			vec3 distortion = (texture2D(distortionTexture, vec2(0.5 * vUv.x + uTime / 30., 3. * vUv.y - uTime / 30.) * 1.).rgb) * 0.1;
+			vec3 distortion2 = (texture2D(distortionTexture, vec2(0.3 * -vUv.x - uTime / 30., 0.1 * vUv.y - uTime / 30.)).rgb) * 0.1;
 			vec3 reflectUv = distortion + distortion2;
-			reflectUv = clamp(reflectUv, 0.001, 0.999);
+			reflectUv = clamp(reflectUv, 0.035, 0.999);
 
 			// v2
 			// vec2 flowmap = texture2D(distortionTexture, vUv / 20.).rg * 2. - 1.;
