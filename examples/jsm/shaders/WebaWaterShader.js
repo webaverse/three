@@ -158,10 +158,10 @@ var WebaWaterSSRShader = {
 			#endif
 
 			// v1
-			vec3 distortion = (texture2D(distortionTexture, vec2(0.5 * vUv.x + uTime / 10., 3. * vUv.y) * 1.).rgb) * 0.025;
-			vec3 distortion2 = (texture2D(distortionTexture, vec2(0.3 * -vUv.x - uTime / 30., 0.1 * vUv.y - uTime / 30.)).rgb) * 0.025;
+			vec3 distortion = (texture2D(distortionTexture, vec2(0.5 * vUv.x + uTime / 30., 3. * vUv.y - uTime / 30.) * 1.).rgb) * 0.1;
+			vec3 distortion2 = (texture2D(distortionTexture, vec2(0.3 * -vUv.x - uTime / 30., 0.1 * vUv.y - uTime / 30.)).rgb) * 0.1;
 			vec3 reflectUv = distortion + distortion2;
-			reflectUv = clamp(reflectUv, 0.001, 0.999);
+			reflectUv = clamp(reflectUv, 0.035, 0.999);
 
 			// v2
 			// vec2 flowmap = texture2D(distortionTexture, vUv / 20.).rg * 2. - 1.;
@@ -395,7 +395,7 @@ var WebaWaterSSRBlurShader = {
 
 			vec2 offset;
 
-			offset=(vec2(-1,0))*texelSize * 20.;
+			offset=(vec2(-1,0))*texelSize;
 			vec4 cl=texture2D(tDiffuse,vUv+offset);
 
 			offset=(vec2(1,0))*texelSize;
@@ -628,111 +628,6 @@ var WebaWaterMaskShader = {
 
 
 };
-var WebaWaterBlankShader = {
-	vertexShader: /* glsl */`
-		void main() {
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-		void main() {
-			gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-		}
-	`
 
 
-};
-
-var WebaWaterCombineShader = {
-
-	uniforms: {
-		'time': { value: 0 },
-		'tDiffuse': { value: null },
-		'tMask': { value: null },
-		'tDepth': { value: null },
-		'tPlayer': { value: null },
-		'dudvMap': { value: null },
-		'resolution': { value: new Vector2()},
-		'cameraInverseProjectionMatrix': { value: new Matrix4() },
-		'uMatrixWorld': { value: new Matrix4() },
-		
-
-	},
-
-	vertexShader: /* glsl */`
-
-		varying vec2 vUv;
-		varying vec3 vPos;
-
-		void main() {
-
-			vUv = uv;
-			vPos = position;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-			
-
-		}
-
-	`,
-
-	fragmentShader: /* glsl */`
-	#include <common>
-	#include <packing>
-		uniform mat4 cameraInverseProjectionMatrix;
-		uniform mat4 uMatrixWorld;
-		
-
-		uniform sampler2D tDiffuse;
-		uniform sampler2D tMask;
-		uniform sampler2D tPlayer;
-		uniform sampler2D dudvMap;
-		uniform sampler2D tDepth;
-		uniform vec2 resolution;
-		uniform float time;
-
-		varying vec2 vUv;
-		varying vec3 vPos;
-
-		void main() {
-			vec4 diffuse = texture2D( tDiffuse, vUv );
-			vec4 mask = texture2D( tMask, vUv );
-			vec4 player = texture2D( tPlayer, vUv );
-
-			float normalizedDepth = unpackRGBAToDepth(  texture2D( tDepth, gl_FragCoord.xy / resolution) ); 
-			vec4 ndc = vec4(
-				(vUv.x - 0.5) * 2.0,
-				(vUv.y - 0.5) * 2.0,
-				(normalizedDepth - 0.5) * 2.0,
-				1.0);
-
-			
-			vec4 clip = cameraInverseProjectionMatrix * ndc;
-			vec4 view = uMatrixWorld * (clip / clip.w);
-			vec3 worldPos = view.xyz;
-			
-
-			if(mask.a > 0.1 && mask.r < 1. && player.r > 0.1){
-                float diff = mask.r;
-
-
-				vec2 channelA = texture2D( dudvMap, vec2(0.25 * worldPos.x + time * 0.08, 0.5 * worldPos.z - time * 0.05) ).rg;
-				vec2 channelB = texture2D( dudvMap, vec2(0.5 * worldPos.x - time * 0.07, 0.35 * worldPos.z + time * 0.06) ).rg;
-
-                vec2 displacement = (channelA + channelB) * 0.5;
-                displacement = ( ( displacement * 2.0 ) - 1.0 ) * 1.0;
-                diff += displacement.x;
-        
-                gl_FragColor = mix( vec4(1.0, 1.0, 1.0, diffuse.a), diffuse, step( 0.5, diff ) );
-			}
-			else{
-				gl_FragColor = diffuse;
-			}
-		}
-	`
-
-
-};
-
-export { WebaWaterSSRShader, WebaWaterSSRDepthShader, WebaWaterSSRBlurShader, WebaWaterEdgeHBlurShader, WebaWaterEdgeVBlurShader, WebaWaterMaskShader, WebaWaterBlankShader, WebaWaterCombineShader };
+export { WebaWaterSSRShader, WebaWaterSSRDepthShader, WebaWaterSSRBlurShader, WebaWaterEdgeHBlurShader, WebaWaterEdgeVBlurShader, WebaWaterMaskShader};
