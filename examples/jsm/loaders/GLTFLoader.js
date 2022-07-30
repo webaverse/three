@@ -2923,9 +2923,9 @@ class GLTFParser {
 
 			return texture;
 
-		} ).catch( function () {
+		} ).catch( function (err) {
 
-			console.error( 'THREE.GLTFLoader: Couldn\'t load texture', sourceURI );
+			console.error( 'THREE.GLTFLoader: Couldn\'t load texture', sourceURI, err );
 			return null;
 
 		} );
