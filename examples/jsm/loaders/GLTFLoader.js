@@ -2885,7 +2885,15 @@ class GLTFParser {
 
 				}
 
-				loader.load( LoaderUtils.resolveURL( sourceURI, options.path ), onLoad, undefined, reject );
+				(async () => {
+					const res = await fetch(LoaderUtils.resolveURL( sourceURI, options.path ));
+					const blob = await res.blob();
+					const imageBitmap = await createImageBitmap(blob);
+					const texture = new Texture(imageBitmap);
+					texture.needsUpdate = true;
+					return texture;
+				})().then(onLoad).catch(reject);
+				// loader.load( LoaderUtils.resolveURL( sourceURI, options.path ), onLoad, undefined, reject );
 
 			} );
 
