@@ -12,6 +12,7 @@
     },
     "./examples/fonts/*": "./examples/fonts/*",
     "./examples/jsm/*": "./examples/jsm/*",
+    "./examples/js/*": "./examples/js/*",
     "./src/*": "./src/*"
   },
   "repository": {
@@ -163,7 +164,8 @@
       "README.md",
       "build/three.js",
       "build/three.min.js",
-      "build/three.module.js"
+      "build/three.module.js",
+      "examples/"
     ],
     "directories": {}
   }
