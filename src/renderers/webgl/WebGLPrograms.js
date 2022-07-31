@@ -202,16 +202,16 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			numRectAreaLights: lights.rectArea.length,
 			numHemiLights: lights.hemi.length,
 
-			numDirLightShadows: lights.directionalShadowMap.length,
-			numPointLightShadows: lights.pointShadowMap.length,
-			numSpotLightShadows: lights.spotShadowMap.length,
+			umDirLightShadows: object.receiveShadow ? lights.directionalShadowMap.length : 0,
+			numPointLightShadows: object.receiveShadow ? lights.pointShadowMap.length : 0,
+			numSpotLightShadows: object.receiveShadow ? lights.spotShadowMap.length : 0,
 
 			numClippingPlanes: clipping.numPlanes,
 			numClipIntersection: clipping.numIntersection,
 
 			dithering: material.dithering,
 
-			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0,
+			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0 && object.receiveShadow,
 			shadowMapType: renderer.shadowMap.type,
 
 			toneMapping: material.toneMapped ? renderer.toneMapping : NoToneMapping,
@@ -235,16 +235,24 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			rendererExtensionFragDepth: isWebGL2 || extensions.has( 'EXT_frag_depth' ),
 			rendererExtensionDrawBuffers: isWebGL2 || extensions.has( 'WEBGL_draw_buffers' ),
 			rendererExtensionShaderTextureLod: isWebGL2 || extensions.has( 'EXT_shader_texture_lod' ),
+			rendererExtensionMultiDraw: object.isBatchedMesh && extensions.has( 'WEBGL_multi_draw' ),
 
-			customProgramCacheKey: material.customProgramCacheKey()
+			customProgramCacheKey: material.customProgramCacheKey(),
+			programCacheKey: '',
 
 		};
+
+		parameters.programCacheKey = material.programCacheKey(parameters);
 
 		return parameters;
 
 	}
 
 	function getProgramCacheKey( parameters ) {
+
+		if (parameters.programCacheKey) {
+			return parameters.programCacheKey;
+		}
 
 		const array = [];
 

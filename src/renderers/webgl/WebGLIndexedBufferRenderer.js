@@ -58,12 +58,38 @@ function WebGLIndexedBufferRenderer( gl, extensions, info, capabilities ) {
 
 	}
 
+	// @TODO: Rename
+	function renderMultiDraw( starts, counts, drawCount ) {
+
+		const extension = extensions.get( 'WEBGL_multi_draw' );
+
+		// @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsWEBGL( mode, counts, 0, type, starts, 0, drawCount );
+
+		// @TODO: info.update()
+
+	}
+	function renderMultiDrawInstances( starts, counts, instances, drawCount ) {
+
+		const extension = extensions.get( 'WEBGL_multi_draw' );
+
+		// @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsInstancedWEBGL( mode, counts, 0, type, starts, 0, instances, 0, drawCount );
+
+		// @TODO: info.update()
+
+	}
+
 	//
 
 	this.setMode = setMode;
 	this.setIndex = setIndex;
 	this.render = render;
 	this.renderInstances = renderInstances;
+	this.renderMultiDraw = renderMultiDraw;
+	this.renderMultiDrawInstances = renderMultiDrawInstances;
 
 }
 

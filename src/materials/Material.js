@@ -107,6 +107,22 @@ class Material extends EventDispatcher {
 
 	}
 
+	programCacheKey(parameters) {
+		return '';
+	}
+
+	freeze(freezeFn = parameters => {
+		// this implementation ensures that the typical vertex shader parameters are keyed in the cache
+		return [
+			'freeze',
+			this.uuid,
+			parameters.maxBones,
+			parameters.morphTargetsCount,
+		].join(',');
+	}) {
+		this.programCacheKey = freezeFn;
+	}
+
 	setValues( values ) {
 
 		if ( values === undefined ) return;

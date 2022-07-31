@@ -6731,6 +6731,17 @@ class Material extends EventDispatcher {
 		return this.onBeforeCompile.toString();
 	}
 
+	programCacheKey(parameters) {
+		return '';
+	}
+
+	freeze(freezeFn = parameters => {
+		// this implementation ensures that the typical vertex shader parameters are keyed in the cache
+		return ['freeze', this.uuid, parameters.maxBones, parameters.morphTargetsCount].join(',');
+	}) {
+		this.programCacheKey = freezeFn;
+	}
+
 	setValues(values) {
 		if (values === undefined) return;
 
@@ -11276,12 +11287,27 @@ function WebGLBufferRenderer(gl, extensions, info, capabilities) {
 
 		extension[methodName](mode, start, count, primcount);
 		info.update(count, mode, primcount);
+	} // @TODO: Rename
+
+
+	function renderMultiDraw(starts, counts, drawCount) {
+		const extension = extensions.get('WEBGL_multi_draw'); // @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsWEBGL(mode, counts, 0, type, starts, 0, drawCount); // @TODO: info.update()
+	}
+
+	function renderMultiDrawInstances(starts, counts, instances, drawCount) {
+		const extension = extensions.get('WEBGL_multi_draw'); // @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsInstancedWEBGL(mode, counts, 0, type, starts, 0, instances, 0, drawCount); // @TODO: info.update()
 	} //
 
 
 	this.setMode = setMode;
 	this.render = render;
 	this.renderInstances = renderInstances;
+	this.renderMultiDraw = renderMultiDraw;
+	this.renderMultiDrawInstances = renderMultiDrawInstances;
 }
 
 function WebGLCapabilities(gl, extensions, parameters) {
@@ -12678,6 +12704,19 @@ function WebGLIndexedBufferRenderer(gl, extensions, info, capabilities) {
 
 		extension[methodName](mode, count, type, start * bytesPerElement, primcount);
 		info.update(count, mode, primcount);
+	} // @TODO: Rename
+
+
+	function renderMultiDraw(starts, counts, drawCount) {
+		const extension = extensions.get('WEBGL_multi_draw'); // @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsWEBGL(mode, counts, 0, type, starts, 0, drawCount); // @TODO: info.update()
+	}
+
+	function renderMultiDrawInstances(starts, counts, instances, drawCount) {
+		const extension = extensions.get('WEBGL_multi_draw'); // @TODO: if error handling for extension === null
+
+		extension.multiDrawElementsInstancedWEBGL(mode, counts, 0, type, starts, 0, instances, 0, drawCount); // @TODO: info.update()
 	} //
 
 
@@ -12685,6 +12724,8 @@ function WebGLIndexedBufferRenderer(gl, extensions, info, capabilities) {
 	this.setIndex = setIndex;
 	this.render = render;
 	this.renderInstances = renderInstances;
+	this.renderMultiDraw = renderMultiDraw;
+	this.renderMultiDrawInstances = renderMultiDrawInstances;
 }
 
 function WebGLInfo(gl) {
@@ -14143,7 +14184,7 @@ function WebGLProgram(renderer, cacheKey, parameters, bindingStates) {
 	if (parameters.isWebGL2 && parameters.isRawShaderMaterial !== true) {
 		// GLSL 3.0 conversion for built-in materials and ShaderMaterial
 		versionString = '#version 300 es\n';
-		prefixVertex = ['precision mediump sampler2DArray;', '#define attribute in', '#define varying out', '#define texture2D texture'].join('\n') + '\n' + prefixVertex;
+		prefixVertex = [parameters.rendererExtensionMultiDraw ? '#extension GL_ANGLE_multi_draw : require' : '', 'precision mediump sampler2DArray;', '#define attribute in', '#define varying out', '#define texture2D texture'].join('\n') + '\n' + prefixVertex;
 		prefixFragment = ['#define varying in', parameters.glslVersion === GLSL3 ? '' : 'layout(location = 0) out highp vec4 pc_fragColor;', parameters.glslVersion === GLSL3 ? '' : '#define gl_FragColor pc_fragColor', '#define gl_FragDepthEXT gl_FragDepth', '#define texture2D texture', '#define textureCube texture', '#define texture2DProj textureProj', '#define texture2DLodEXT textureLod', '#define texture2DProjLodEXT textureProjLod', '#define textureCubeLodEXT textureLod', '#define texture2DGradEXT textureGrad', '#define texture2DProjGradEXT textureProjGrad', '#define textureCubeGradEXT textureGrad'].join('\n') + '\n' + prefixFragment;
 	}
 
@@ -14482,13 +14523,13 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
 			numSpotLights: lights.spot.length,
 			numRectAreaLights: lights.rectArea.length,
 			numHemiLights: lights.hemi.length,
-			numDirLightShadows: lights.directionalShadowMap.length,
-			numPointLightShadows: lights.pointShadowMap.length,
-			numSpotLightShadows: lights.spotShadowMap.length,
+			umDirLightShadows: object.receiveShadow ? lights.directionalShadowMap.length : 0,
+			numPointLightShadows: object.receiveShadow ? lights.pointShadowMap.length : 0,
+			numSpotLightShadows: object.receiveShadow ? lights.spotShadowMap.length : 0,
 			numClippingPlanes: clipping.numPlanes,
 			numClipIntersection: clipping.numIntersection,
 			dithering: material.dithering,
-			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0,
+			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0 && object.receiveShadow,
 			shadowMapType: renderer.shadowMap.type,
 			toneMapping: material.toneMapped ? renderer.toneMapping : NoToneMapping,
 			physicallyCorrectLights: renderer.physicallyCorrectLights,
@@ -14505,12 +14546,19 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
 			rendererExtensionFragDepth: isWebGL2 || extensions.has('EXT_frag_depth'),
 			rendererExtensionDrawBuffers: isWebGL2 || extensions.has('WEBGL_draw_buffers'),
 			rendererExtensionShaderTextureLod: isWebGL2 || extensions.has('EXT_shader_texture_lod'),
-			customProgramCacheKey: material.customProgramCacheKey()
+			rendererExtensionMultiDraw: object.isBatchedMesh && extensions.has('WEBGL_multi_draw'),
+			customProgramCacheKey: material.customProgramCacheKey(),
+			programCacheKey: ''
 		};
+		parameters.programCacheKey = material.programCacheKey(parameters);
 		return parameters;
 	}
 
 	function getProgramCacheKey(parameters) {
+		if (parameters.programCacheKey) {
+			return parameters.programCacheKey;
+		}
+
 		const array = [];
 
 		if (parameters.shaderID) {
@@ -15005,7 +15053,7 @@ function shadowCastingLightsFirst(lightA, lightB) {
 	return (lightB.castShadow ? 1 : 0) - (lightA.castShadow ? 1 : 0);
 }
 
-function WebGLLights(extensions, capabilities) {
+function WebGLLights$1(extensions, capabilities) {
 	const cache = new UniformsCache();
 	const shadowCache = ShadowUniformsCache();
 	const state = {
@@ -15279,7 +15327,7 @@ function WebGLLights(extensions, capabilities) {
 }
 
 function WebGLRenderState(extensions, capabilities) {
-	const lights = new WebGLLights(extensions, capabilities);
+	const lights = new WebGLLights$1(extensions, capabilities);
 	const lightsArray = [];
 	const shadowsArray = [];
 
@@ -15422,11 +15470,18 @@ function WebGLShadowMap(_renderer, _objects, _capabilities) {
 				_viewportSize = new Vector2(),
 				_viewport = new Vector4(),
 				_depthMaterial = new MeshDepthMaterial({
-		depthPacking: RGBADepthPacking
+		depthPacking: RGBADepthPacking,
+		fog: false
 	}),
-				_distanceMaterial = new MeshDistanceMaterial(),
+				_distanceMaterial = new MeshDistanceMaterial({
+		fog: false
+	}),
 				_materialCache = {},
 				_maxTextureSize = _capabilities.maxTextureSize;
+
+	_depthMaterial.freeze();
+
+	_distanceMaterial.freeze();
 
 	const shadowSide = {
 		0: BackSide,
@@ -17808,11 +17863,16 @@ function WebGLTextures(_gl, extensions, state, properties, capabilities, utils, 
 		}
 
 		return image;
+	}
+
+	function getTexture(texture) {
+		return properties.get(texture).__webglTexture;
 	} //
 
 
 	this.allocateTextureUnit = allocateTextureUnit;
 	this.resetTextureUnits = resetTextureUnits;
+	this.getTexture = getTexture;
 	this.setTexture2D = setTexture2D;
 	this.setTexture2DArray = setTexture2DArray;
 	this.setTexture3D = setTexture3D;
@@ -19580,7 +19640,11 @@ function WebGLRenderer(parameters = {}) {
 	let _clippingEnabled = false;
 	let _localClippingEnabled = false; // transmission
 
-	let _transmissionRenderTarget = null; // camera matrices cache
+	let _transmissionRenderTarget = null; // Multi draw
+
+	const multiDrawStarts = [];
+	const multiDrawCounts = [];
+	const multiDrawInstanceCounts = []; // camera matrices cache
 
 	const _projScreenMatrix = new Matrix4();
 
@@ -19708,6 +19772,8 @@ function WebGLRenderer(parameters = {}) {
 		_this.shadowMap = shadowMap;
 		_this.state = state;
 		_this.info = info;
+		_this.attributes = attributes;
+		_this.textures = textures;
 	}
 
 	initGLContext(); // xr
@@ -20022,7 +20088,18 @@ function WebGLRenderer(parameters = {}) {
 			renderer.setMode(_gl.TRIANGLES);
 		}
 
-		if (object.isInstancedMesh) {
+		if (object.isBatchedMesh) {
+			// @TODO: Instancing Batched mesh support
+			object.getDrawSpec(camera, multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts);
+
+			if (multiDrawStarts.length > 0) {
+				if (object.isInstancedMesh) {
+					renderer.renderMultiDrawInstances(multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts, multiDrawStarts.length);
+				} else {
+					renderer.renderMultiDraw(multiDrawStarts, multiDrawCounts, multiDrawStarts.length);
+				}
+			}
+		} else if (object.isInstancedMesh) {
 			renderer.renderInstances(drawStart, drawCount, object.count);
 		} else if (geometry.isInstancedBufferGeometry) {
 			const instanceCount = Math.min(geometry.instanceCount, geometry._maxInstanceCount);
@@ -20209,6 +20286,28 @@ function WebGLRenderer(parameters = {}) {
 
 					const geometry = objects.update(object);
 					const material = object.material;
+
+					if (material.visible) {
+						currentRenderList.push(object, geometry, material, groupOrder, _vector3.z, null);
+					}
+				}
+			} else if (object.isBatchedMesh) {
+				// object.resetCullingStatus();
+				if (object.isSkinnedMesh) {
+					// update skeleton only once in a frame
+					if (object.skeleton.frame !== info.render.frame) {
+						object.skeleton.update();
+						object.skeleton.frame = info.render.frame;
+					}
+				}
+
+				if (!object.frustumCulled || object.intersectsFrustum(_frustum)) {
+					if (sortObjects) {
+						_vector3.setFromMatrixPosition(object.matrixWorld).applyMatrix4(_projScreenMatrix);
+					}
+
+					const geometry = objects.update(object);
+					const material = object.material; // @TODO: Support multi materials?
 
 					if (material.visible) {
 						currentRenderList.push(object, geometry, material, groupOrder, _vector3.z, null);
@@ -20431,6 +20530,15 @@ function WebGLRenderer(parameters = {}) {
 		materialProperties.uniformsList = uniformsList;
 		return program;
 	}
+
+	this.getProgramCacheKey = (object, material) => {
+		const scene = new Scene();
+		const lights = new WebGLLights();
+		const shadowsArray = [];
+		const parameters = programCache.getParameters(material, lights.state, shadowsArray, scene, object);
+		const programCacheKey = programCache.getProgramCacheKey(parameters);
+		return programCacheKey;
+	};
 
 	function updateCommonMaterialProperties(material, parameters) {
 		const materialProperties = properties.get(material);
@@ -20964,6 +21072,84 @@ function WebGLRenderer(parameters = {}) {
 		state.unbindTexture();
 	};
 
+	function clientWaitAsync(sync, flags = 0, interval_ms = 10) {
+		return new Promise((resolve, reject) => {
+			let check = () => {
+				const res = _gl.clientWaitSync(sync, flags, 0);
+
+				if (res == _gl.WAIT_FAILED) {
+					reject();
+					return;
+				}
+
+				if (res == _gl.TIMEOUT_EXPIRED) {
+					setTimeout(check, interval_ms);
+					return;
+				}
+
+				resolve();
+			};
+
+			check();
+		});
+	}
+
+	function readPixelsAsync(x, y, w, h, format, type, texture, outputBuffer) {
+		// latch old fb
+		const oldFb = _gl.getParameter(_gl.FRAMEBUFFER_BINDING);
+
+		const tempFb = _gl.createFramebuffer();
+
+		{
+			// make this the current frame buffer
+			_gl.bindFramebuffer(_gl.FRAMEBUFFER, tempFb); // attach the texture to the framebuffer.
+
+
+			_gl.framebufferTexture2D(_gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, texture, 0);
+		} // read pixels
+
+		const buf = _gl.createBuffer();
+
+		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
+
+		_gl.bufferData(_gl.PIXEL_PACK_BUFFER, outputBuffer.byteLength, _gl.STREAM_READ);
+
+		_gl.readPixels(x, y, w, h, format, type, 0);
+
+		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
+
+		const sync = _gl.fenceSync(_gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+		if (!sync) {
+			return Promise.resolve(null);
+		} // restore old fb and dispose of the temporary fb
+
+
+		_gl.bindFramebuffer(_gl.FRAMEBUFFER, oldFb);
+
+		_gl.deleteFramebuffer(tempFb); // flush
+
+
+		_gl.flush(); // wait for results
+
+
+		return clientWaitAsync(sync, 0, 10).then(() => {
+			_gl.deleteSync(sync);
+
+			_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
+
+			_gl.getBufferSubData(_gl.PIXEL_PACK_BUFFER, 0, outputBuffer);
+
+			_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
+
+			_gl.deleteBuffer(buf);
+
+			return outputBuffer;
+		});
+	}
+
+	this.readPixelsAsync = readPixelsAsync;
+
 	this.initTexture = function (texture) {
 		if (texture.isCubeTexture) {
 			textures.setTextureCube(texture, 0);
@@ -21043,7 +21229,7 @@ class Fog {
 
 }
 
-class Scene extends Object3D {
+class Scene$1 extends Object3D {
 	constructor() {
 		super();
 		this.isScene = true;
@@ -30601,7 +30787,7 @@ class ObjectLoader extends Loader {
 
 		switch (data.type) {
 			case 'Scene':
-				object = new Scene();
+				object = new Scene$1();
 
 				if (data.background !== undefined) {
 					if (Number.isInteger(data.background)) {
@@ -35753,7 +35939,7 @@ exports.ReverseSubtractEquation = ReverseSubtractEquation;
 exports.RingBufferGeometry = RingGeometry;
 exports.RingGeometry = RingGeometry;
 exports.SRGBColorSpace = SRGBColorSpace;
-exports.Scene = Scene;
+exports.Scene = Scene$1;
 exports.ShaderChunk = ShaderChunk;
 exports.ShaderLib = ShaderLib;
 exports.ShaderMaterial = ShaderMaterial;

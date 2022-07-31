@@ -723,6 +723,7 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 		versionString = '#version 300 es\n';
 
 		prefixVertex = [
+			parameters.rendererExtensionMultiDraw ? '#extension GL_ANGLE_multi_draw : require' : '',
 			'precision mediump sampler2DArray;',
 			'#define attribute in',
 			'#define varying out',

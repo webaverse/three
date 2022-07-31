@@ -201,6 +201,12 @@ function WebGLRenderer( parameters = {} ) {
 
 	let _transmissionRenderTarget = null;
 
+	// Multi draw
+
+	const multiDrawStarts = [];
+	const multiDrawCounts = [];
+	const multiDrawInstanceCounts = [];
+
 	// camera matrices cache
 
 	const _projScreenMatrix = new Matrix4();
@@ -353,6 +359,9 @@ function WebGLRenderer( parameters = {} ) {
 		_this.shadowMap = shadowMap;
 		_this.state = state;
 		_this.info = info;
+
+		_this.attributes = attributes;
+		_this.textures = textures;
 
 	}
 
@@ -825,7 +834,27 @@ function WebGLRenderer( parameters = {} ) {
 
 		}
 
-		if ( object.isInstancedMesh ) {
+		if ( object.isBatchedMesh ) {
+
+			// @TODO: Instancing Batched mesh support
+
+			object.getDrawSpec( camera, multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts );
+
+			if ( multiDrawStarts.length > 0 ) {
+
+				if (object.isInstancedMesh) {
+
+					renderer.renderMultiDrawInstances( multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts, multiDrawStarts.length );
+
+					} else {
+
+						renderer.renderMultiDraw( multiDrawStarts, multiDrawCounts, multiDrawStarts.length );
+
+					}
+
+			}
+
+		} else if ( object.isInstancedMesh ) {
 
 			renderer.renderInstances( drawStart, drawCount, object.count );
 
@@ -1127,6 +1156,45 @@ function WebGLRenderer( parameters = {} ) {
 
 					const geometry = objects.update( object );
 					const material = object.material;
+
+					if ( material.visible ) {
+
+						currentRenderList.push( object, geometry, material, groupOrder, _vector3.z, null );
+
+					}
+
+				}
+
+			} else if ( object.isBatchedMesh ) {
+
+				// object.resetCullingStatus();
+
+				if ( object.isSkinnedMesh ) {
+
+					// update skeleton only once in a frame
+
+					if ( object.skeleton.frame !== info.render.frame ) {
+
+						object.skeleton.update();
+						object.skeleton.frame = info.render.frame;
+
+					}
+
+				}
+
+				if ( ! object.frustumCulled || object.intersectsFrustum( _frustum ) ) {
+
+					if ( sortObjects ) {
+
+						_vector3.setFromMatrixPosition( object.matrixWorld )
+							.applyMatrix4( _projScreenMatrix );
+
+					}
+
+					const geometry = objects.update( object );
+					const material = object.material;
+
+					// @TODO: Support multi materials?
 
 					if ( material.visible ) {
 
@@ -1444,6 +1512,16 @@ function WebGLRenderer( parameters = {} ) {
 		return program;
 
 	}
+
+	this.getProgramCacheKey = (object, material) => {
+		const scene = new Scene();
+		const lights = new WebGLLights();
+		const shadowsArray = [];
+
+		const parameters = programCache.getParameters( material, lights.state, shadowsArray, scene, object );
+		const programCacheKey = programCache.getProgramCacheKey( parameters );
+		return programCacheKey;
+	};
 
 	function updateCommonMaterialProperties( material, parameters ) {
 
@@ -2201,6 +2279,69 @@ function WebGLRenderer( parameters = {} ) {
 		state.unbindTexture();
 
 	};
+
+	function clientWaitAsync(sync, flags = 0, interval_ms = 10) {
+		return new Promise((resolve, reject) => {
+				let check = () => {
+						const res = _gl.clientWaitSync(sync, flags, 0);
+						if (res == _gl.WAIT_FAILED) {
+							reject();
+							return;
+						}
+						if (res == _gl.TIMEOUT_EXPIRED) {
+							setTimeout(check, interval_ms);
+							return;
+						}
+						resolve();
+				};
+
+				check();
+		});
+	}
+	function readPixelsAsync(x, y, w, h, format, type, texture, outputBuffer) {
+		// latch old fb
+		const oldFb = _gl.getParameter(_gl.FRAMEBUFFER_BINDING);
+		const tempFb = _gl.createFramebuffer();
+		{
+			// make this the current frame buffer
+			_gl.bindFramebuffer(_gl.FRAMEBUFFER, tempFb);
+
+			// attach the texture to the framebuffer.
+			_gl.framebufferTexture2D(_gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, texture, 0);
+		}
+
+		// read pixels
+		const buf = _gl.createBuffer();
+		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
+		_gl.bufferData(_gl.PIXEL_PACK_BUFFER, outputBuffer.byteLength, _gl.STREAM_READ);
+		_gl.readPixels(x, y, w, h, format, type, 0);
+		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
+
+		const sync = _gl.fenceSync(_gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+		if (!sync) {
+				return Promise.resolve(null);
+		}
+
+		// restore old fb and dispose of the temporary fb
+		_gl.bindFramebuffer(_gl.FRAMEBUFFER, oldFb);
+		_gl.deleteFramebuffer(tempFb);
+
+		// flush
+		_gl.flush();
+
+		// wait for results
+		return clientWaitAsync(sync, 0, 10).then(() => {
+				_gl.deleteSync(sync);
+
+				_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
+				_gl.getBufferSubData(_gl.PIXEL_PACK_BUFFER, 0, outputBuffer);
+				_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
+				_gl.deleteBuffer(buf);
+
+				return outputBuffer;
+		});
+	}
+	this.readPixelsAsync = readPixelsAsync;
 
 	this.initTexture = function ( texture ) {
 

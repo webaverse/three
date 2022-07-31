@@ -1920,10 +1920,16 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	}
 
+	function getTexture(texture) {
+		return properties.get(texture).__webglTexture;
+  	}
+
 	//
 
 	this.allocateTextureUnit = allocateTextureUnit;
 	this.resetTextureUnits = resetTextureUnits;
+
+	this.getTexture = getTexture;
 
 	this.setTexture2D = setTexture2D;
 	this.setTexture2DArray = setTexture2DArray;
