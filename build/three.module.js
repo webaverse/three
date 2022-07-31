@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2010-2021 Three.js Authors
+ * Copyright 2010-2022 Three.js Authors
  * SPDX-License-Identifier: MIT
  */
 const REVISION = '136';
@@ -7925,22 +7925,6 @@ class Material extends EventDispatcher {
 
 	}
 
-	programCacheKey(parameters) {
-		return '';
-	}
-
-	freeze(freezeFn = parameters => {
-		// this implementation ensures that the typical vertex shader parameters are keyed in the cache
-		return [
-			'freeze',
-			this.uuid,
-			parameters.maxBones,
-			parameters.morphTargetsCount,
-		].join(',');
-	}) {
-		this.programCacheKey = freezeFn;
-	}
-
 	setValues( values ) {
 
 		if ( values === undefined ) return;
@@ -14486,37 +14470,11 @@ function WebGLBufferRenderer( gl, extensions, info, capabilities ) {
 
 	}
 
-	// @TODO: Rename
-	function renderMultiDraw( starts, counts, drawCount ) {
-
-		const extension = extensions.get( 'WEBGL_multi_draw' );
-
-		// @TODO: if error handling for extension === null
-
-		extension.multiDrawElementsWEBGL( mode, counts, 0, type, starts, 0, drawCount );
-
-		// @TODO: info.update()
-
-	}
-	function renderMultiDrawInstances( starts, counts, instances, drawCount ) {
-
-		const extension = extensions.get( 'WEBGL_multi_draw' );
-
-		// @TODO: if error handling for extension === null
-
-		extension.multiDrawElementsInstancedWEBGL( mode, counts, 0, type, starts, 0, instances, 0, drawCount );
-
-		// @TODO: info.update()
-
-	}
-
 	//
 
 	this.setMode = setMode;
 	this.render = render;
 	this.renderInstances = renderInstances;
-	this.renderMultiDraw = renderMultiDraw;
-	this.renderMultiDrawInstances = renderMultiDrawInstances;
 
 }
 
@@ -16397,38 +16355,12 @@ function WebGLIndexedBufferRenderer( gl, extensions, info, capabilities ) {
 
 	}
 
-	// @TODO: Rename
-	function renderMultiDraw( starts, counts, drawCount ) {
-
-		const extension = extensions.get( 'WEBGL_multi_draw' );
-
-		// @TODO: if error handling for extension === null
-
-		extension.multiDrawElementsWEBGL( mode, counts, 0, type, starts, 0, drawCount );
-
-		// @TODO: info.update()
-
-	}
-	function renderMultiDrawInstances( starts, counts, instances, drawCount ) {
-
-		const extension = extensions.get( 'WEBGL_multi_draw' );
-
-		// @TODO: if error handling for extension === null
-
-		extension.multiDrawElementsInstancedWEBGL( mode, counts, 0, type, starts, 0, instances, 0, drawCount );
-
-		// @TODO: info.update()
-
-	}
-
 	//
 
 	this.setMode = setMode;
 	this.setIndex = setIndex;
 	this.render = render;
 	this.renderInstances = renderInstances;
-	this.renderMultiDraw = renderMultiDraw;
-	this.renderMultiDrawInstances = renderMultiDrawInstances;
 
 }
 
@@ -18624,7 +18556,6 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 		versionString = '#version 300 es\n';
 
 		prefixVertex = [
-			parameters.rendererExtensionMultiDraw ? '#extension GL_ANGLE_multi_draw : require' : '',
 			'precision mediump sampler2DArray;',
 			'#define attribute in',
 			'#define varying out',
@@ -19200,9 +19131,9 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			numRectAreaLights: lights.rectArea.length,
 			numHemiLights: lights.hemi.length,
 
-			numDirLightShadows: object.receiveShadow ? lights.directionalShadowMap.length : 0,
-			numPointLightShadows: object.receiveShadow ? lights.pointShadowMap.length : 0,
-			numSpotLightShadows: object.receiveShadow ? lights.spotShadowMap.length : 0,
+			numDirLightShadows: lights.directionalShadowMap.length,
+			numPointLightShadows: lights.pointShadowMap.length,
+			numSpotLightShadows: lights.spotShadowMap.length,
 
 			numClippingPlanes: clipping.numPlanes,
 			numClipIntersection: clipping.numIntersection,
@@ -19210,7 +19141,7 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			format: material.format,
 			dithering: material.dithering,
 
-			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0 && object.receiveShadow,
+			shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0,
 			shadowMapType: renderer.shadowMap.type,
 
 			toneMapping: material.toneMapped ? renderer.toneMapping : NoToneMapping,
@@ -19233,25 +19164,17 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			rendererExtensionFragDepth: isWebGL2 || extensions.has( 'EXT_frag_depth' ),
 			rendererExtensionDrawBuffers: isWebGL2 || extensions.has( 'WEBGL_draw_buffers' ),
 			rendererExtensionShaderTextureLod: isWebGL2 || extensions.has( 'EXT_shader_texture_lod' ),
-			rendererExtensionMultiDraw: object.isBatchedMesh && extensions.has( 'WEBGL_multi_draw' ),
 			rendererExtensionParallelShaderCompile: extensions.has( 'KHR_parallel_shader_compile' ),
 
-			customProgramCacheKey: material.customProgramCacheKey(),
-			programCacheKey: '',
+			customProgramCacheKey: material.customProgramCacheKey()
 
 		};
-
-		parameters.programCacheKey = material.programCacheKey(parameters);
 
 		return parameters;
 
 	}
 
 	function getProgramCacheKey( parameters ) {
-
-		if (parameters.programCacheKey) {
-			return parameters.programCacheKey;
-		}
 
 		const array = [];
 
@@ -20616,15 +20539,12 @@ function WebGLShadowMap( _renderer, _objects, _capabilities ) {
 
 		_viewport = new Vector4(),
 
-		_depthMaterial = new MeshDepthMaterial( { depthPacking: RGBADepthPacking, fog: false } ),
-		_distanceMaterial = new MeshDistanceMaterial({ fog: false }),
+		_depthMaterial = new MeshDepthMaterial( { depthPacking: RGBADepthPacking } ),
+		_distanceMaterial = new MeshDistanceMaterial(),
 
 		_materialCache = {},
 
 		_maxTextureSize = _capabilities.maxTextureSize;
-
-	_depthMaterial.freeze();
-	_distanceMaterial.freeze();
 
 	const shadowSide = { 0: BackSide, 1: FrontSide, 2: DoubleSide };
 
@@ -23772,10 +23692,6 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	}
 
-	function getTexture(texture) {
-		  return properties.get(texture).__webglTexture;
-	}
-
 	//
 
 	this.allocateTextureUnit = allocateTextureUnit;
@@ -23794,7 +23710,6 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	this.safeSetTexture2D = safeSetTexture2D;
 	this.safeSetTextureCube = safeSetTextureCube;
-	this.getTexture = getTexture;
 
 }
 
@@ -25927,12 +25842,6 @@ function WebGLRenderer( parameters = {} ) {
 
 	let _transmissionRenderTarget = null;
 
-	// Multi draw
-
-	const multiDrawStarts = [];
-	const multiDrawCounts = [];
-	const multiDrawInstanceCounts = [];
-
 	// camera matrices cache
 
 	const _projScreenMatrix = new Matrix4();
@@ -26054,7 +25963,7 @@ function WebGLRenderer( parameters = {} ) {
 
 		_currentDrawBuffers[ 0 ] = 1029;
 
-		info = new WebGLInfo( _gl );
+		info = new WebGLInfo();
 		properties = new WebGLProperties();
 		textures = new WebGLTextures( _gl, extensions, state, properties, capabilities, utils, info );
 		cubemaps = new WebGLCubeMaps( _this );
@@ -26084,9 +25993,6 @@ function WebGLRenderer( parameters = {} ) {
 		_this.shadowMap = shadowMap;
 		_this.state = state;
 		_this.info = info;
-
-		_this.attributes = attributes;
-		_this.textures = textures;
 
 	}
 
@@ -26551,27 +26457,7 @@ function WebGLRenderer( parameters = {} ) {
 
 		}
 
-		if ( object.isBatchedMesh ) {
-
-			// @TODO: Instancing Batched mesh support
-
-			object.getDrawSpec( camera, multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts );
-
-			if ( multiDrawStarts.length > 0 ) {
-
-				if (object.isInstancedMesh) {
-
-					renderer.renderMultiDrawInstances( multiDrawStarts, multiDrawCounts, multiDrawInstanceCounts, multiDrawStarts.length );
-				
-					} else {
-
-						renderer.renderMultiDraw( multiDrawStarts, multiDrawCounts, multiDrawStarts.length );
-				
-					}
-
-			}
-
-		} else if ( object.isInstancedMesh ) {
+		if ( object.isInstancedMesh ) {
 
 			renderer.renderInstances( drawStart, drawCount, object.count );
 
@@ -27072,45 +26958,6 @@ function WebGLRenderer( parameters = {} ) {
 
 				}
 
-			} else if ( object.isBatchedMesh ) {
-
-				// object.resetCullingStatus();
-
-				if ( object.isSkinnedMesh ) {
-
-					// update skeleton only once in a frame
-
-					if ( object.skeleton.frame !== info.render.frame ) {
-
-						object.skeleton.update();
-						object.skeleton.frame = info.render.frame;
-
-					}
-
-				}
-				
-				if ( ! object.frustumCulled || object.intersectsFrustum( _frustum ) ) {
-
-					if ( sortObjects ) {
-
-						_vector3.setFromMatrixPosition( object.matrixWorld )
-							.applyMatrix4( _projScreenMatrix );
-
-					}
-
-					const geometry = objects.update( object );
-					const material = object.material;
-
-					// @TODO: Support multi materials?
-
-					if ( material.visible ) {
-
-						currentRenderList.push( object, geometry, material, groupOrder, _vector3.z, null );
-
-					}
-
-				}
-
 			} else if ( object.isMesh || object.isLine || object.isPoints ) {
 
 				if ( object.isSkinnedMesh ) {
@@ -27398,16 +27245,6 @@ function WebGLRenderer( parameters = {} ) {
 		return program;
 
 	}
-
-	this.getProgramCacheKey = (object, material) => {
-		const scene = new Scene();
-		const lights = new WebGLLights();
-		const shadowsArray = [];
-
-		const parameters = programCache.getParameters( material, lights.state, shadowsArray, scene, object );
-		const programCacheKey = programCache.getProgramCacheKey( parameters );
-		return programCacheKey;
-	};
 
 	function getUniformList( materialProperties ) {
 
@@ -28218,69 +28055,6 @@ function WebGLRenderer( parameters = {} ) {
 		state.unbindTexture();
 
 	};
-
-	function clientWaitAsync(sync, flags = 0, interval_ms = 10) {
-		return new Promise((resolve, reject) => {
-				let check = () => {
-						const res = _gl.clientWaitSync(sync, flags, 0);
-						if (res == _gl.WAIT_FAILED) {
-							reject();
-							return;
-						}
-						if (res == _gl.TIMEOUT_EXPIRED) {
-							setTimeout(check, interval_ms);
-							return;
-						}
-						resolve();
-				};
-	
-				check();
-		});
-	}
-	function readPixelsAsync(x, y, w, h, format, type, texture, outputBuffer) {
-		// latch old fb
-		const oldFb = _gl.getParameter(_gl.FRAMEBUFFER_BINDING);
-		const tempFb = _gl.createFramebuffer();
-		{
-			// make this the current frame buffer
-			_gl.bindFramebuffer(_gl.FRAMEBUFFER, tempFb);
-	
-			// attach the texture to the framebuffer.
-			_gl.framebufferTexture2D(_gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, texture, 0);
-		}
-	
-		// read pixels
-		const buf = _gl.createBuffer();
-		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
-		_gl.bufferData(_gl.PIXEL_PACK_BUFFER, outputBuffer.byteLength, _gl.STREAM_READ);
-		_gl.readPixels(x, y, w, h, format, type, 0);
-		_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
-	
-		const sync = _gl.fenceSync(_gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-		if (!sync) {
-				return Promise.resolve(null);
-		}
-	
-		// restore old fb and dispose of the temporary fb
-		_gl.bindFramebuffer(_gl.FRAMEBUFFER, oldFb);
-		_gl.deleteFramebuffer(tempFb);
-	
-		// flush
-		_gl.flush();
-	
-		// wait for results
-		return clientWaitAsync(sync, 0, 10).then(() => {
-				_gl.deleteSync(sync);
-	
-				_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, buf);
-				_gl.getBufferSubData(_gl.PIXEL_PACK_BUFFER, 0, outputBuffer);
-				_gl.bindBuffer(_gl.PIXEL_PACK_BUFFER, null);
-				_gl.deleteBuffer(buf);
-	
-				return outputBuffer;
-		});
-	}
-	this.readPixelsAsync = readPixelsAsync;
 
 	this.initTexture = function ( texture ) {
 
