@@ -9,6 +9,14 @@ export const LinearToLinear = new ShaderNode( ( inputs ) => {
 
 } );
 
+export const sRGBToLinear = new ShaderNode( ( inputs ) => {
+
+	const { value } = inputs;
+
+	return vec4( mix( pow( value.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), value.rgb * 0.0773993808, vec3( lessThanEqual( value.rgb, vec3( 0.04045 ) ) ) ), value.a );
+
+} );
+
 export const LinearTosRGB = new ShaderNode( ( inputs ) => {
 
 	const { value } = inputs;
@@ -27,7 +35,8 @@ export const LinearTosRGB = new ShaderNode( ( inputs ) => {
 
 const EncodingLib = {
 	LinearToLinear,
-	LinearTosRGB
+	LinearTosRGB,
+	sRGBToLinear,
 };
 
 class ColorSpaceNode extends TempNode {
