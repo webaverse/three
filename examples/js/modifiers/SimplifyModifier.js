@@ -13,24 +13,7 @@
 
 	class SimplifyModifier {
 
-		constructor() {
-
-			if ( THREE.BufferGeometryUtils === undefined ) {
-
-				throw 'THREE.SimplifyModifier relies on THREE.BufferGeometryUtils';
-
-			}
-
-		}
-
 		modify( geometry, count ) {
-
-			if ( geometry.isGeometry === true ) {
-
-				console.error( 'THREE.SimplifyModifier no longer supports Geometry. Use THREE.BufferGeometry instead.' );
-				return;
-
-			}
 
 			geometry = geometry.clone();
 			const attributes = geometry.attributes; // this modifier can only process indexed and non-indexed geomtries with a position attribute
@@ -151,7 +134,7 @@
 
 	function removeFromArray( array, object ) {
 
-		var k = array.indexOf( object );
+		const k = array.indexOf( object );
 		if ( k > - 1 ) array.splice( k, 1 );
 
 	}
@@ -323,7 +306,7 @@
 
 		for ( let i = u.faces.length - 1; i >= 0; i -- ) {
 
-			if ( u.faces[ i ].hasVertex( v ) ) {
+			if ( u.faces[ i ] && u.faces[ i ].hasVertex( v ) ) {
 
 				removeFace( u.faces[ i ], faces );
 

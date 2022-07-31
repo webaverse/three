@@ -8,7 +8,7 @@ import {
 	LoaderUtils,
 	Mesh,
 	MeshPhongMaterial
-} from '../../../build/three.module.js';
+} from 'three';
 import * as fflate from '../libs/fflate.module.js';
 
 /**
@@ -101,7 +101,7 @@ class AMFLoader extends Loader {
 
 				for ( file in zip ) {
 
-					if ( file.toLowerCase().substr( - 4 ) === '.amf' ) {
+					if ( file.toLowerCase().slice( - 4 ) === '.amf' ) {
 
 						break;
 

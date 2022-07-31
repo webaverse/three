@@ -212,16 +212,16 @@
 			function createVisitor( BaseVRMLVisitor ) {
 
 				// the visitor is created dynmaically based on the given base class
-				function VRMLToASTVisitor() {
+				class VRMLToASTVisitor extends BaseVRMLVisitor {
 
-					BaseVRMLVisitor.call( this );
-					this.validateVisitor();
+					constructor() {
 
-				}
+						super();
+						this.validateVisitor();
 
-				VRMLToASTVisitor.prototype = Object.assign( Object.create( BaseVRMLVisitor.prototype ), {
-					constructor: VRMLToASTVisitor,
-					vrml: function ( ctx ) {
+					}
+
+					vrml( ctx ) {
 
 						const data = {
 							version: this.visit( ctx.version ),
@@ -249,13 +249,15 @@
 
 						return data;
 
-					},
-					version: function ( ctx ) {
+					}
+
+					version( ctx ) {
 
 						return ctx.Version[ 0 ].image;
 
-					},
-					node: function ( ctx ) {
+					}
+
+					node( ctx ) {
 
 						const data = {
 							name: ctx.NodeName[ 0 ].image,
@@ -282,8 +284,9 @@
 
 						return data;
 
-					},
-					field: function ( ctx ) {
+					}
+
+					field( ctx ) {
 
 						const data = {
 							name: ctx.Identifier[ 0 ].image,
@@ -309,30 +312,35 @@
 						data.values = result.values;
 						return data;
 
-					},
-					def: function ( ctx ) {
+					}
+
+					def( ctx ) {
 
 						return ( ctx.Identifier || ctx.NodeName )[ 0 ].image;
 
-					},
-					use: function ( ctx ) {
+					}
+
+					use( ctx ) {
 
 						return {
 							USE: ( ctx.Identifier || ctx.NodeName )[ 0 ].image
 						};
 
-					},
-					singleFieldValue: function ( ctx ) {
+					}
+
+					singleFieldValue( ctx ) {
 
 						return processField( this, ctx );
 
-					},
-					multiFieldValue: function ( ctx ) {
+					}
+
+					multiFieldValue( ctx ) {
 
 						return processField( this, ctx );
 
-					},
-					route: function ( ctx ) {
+					}
+
+					route( ctx ) {
 
 						const data = {
 							FROM: ctx.RouteIdentifier[ 0 ].image,
@@ -341,7 +349,8 @@
 						return data;
 
 					}
-				} );
+
+				}
 
 				function processField( scope, ctx ) {
 
@@ -1166,6 +1175,7 @@
 						color.r = value;
 						color.g = value;
 						color.b = value;
+						color.a = 1;
 						break;
 
 					case TEXTURE_TYPE.INTENSITY_ALPHA:
@@ -1182,6 +1192,7 @@
 						color.r = parseInt( '0x' + hex.substring( 2, 4 ) );
 						color.g = parseInt( '0x' + hex.substring( 4, 6 ) );
 						color.b = parseInt( '0x' + hex.substring( 6, 8 ) );
+						color.a = 1;
 						break;
 
 					case TEXTURE_TYPE.RGBA:
@@ -1247,10 +1258,8 @@
 							const width = fieldValues[ 0 ];
 							const height = fieldValues[ 1 ];
 							const num_components = fieldValues[ 2 ];
-							const useAlpha = num_components === 2 || num_components === 4;
 							const textureType = getTextureType( num_components );
-							const size = ( useAlpha === true ? 4 : 3 ) * ( width * height );
-							const data = new Uint8Array( size );
+							const data = new Uint8Array( 4 * width * height );
 							const color = {
 								r: 0,
 								g: 0,
@@ -1261,27 +1270,15 @@
 							for ( let j = 3, k = 0, jl = fieldValues.length; j < jl; j ++, k ++ ) {
 
 								parseHexColor( fieldValues[ j ], textureType, color );
-
-								if ( useAlpha === true ) {
-
-									const stride = k * 4;
-									data[ stride + 0 ] = color.r;
-									data[ stride + 1 ] = color.g;
-									data[ stride + 2 ] = color.b;
-									data[ stride + 3 ] = color.a;
-
-								} else {
-
-									const stride = k * 3;
-									data[ stride + 0 ] = color.r;
-									data[ stride + 1 ] = color.g;
-									data[ stride + 2 ] = color.b;
-
-								}
+								const stride = k * 4;
+								data[ stride + 0 ] = color.r;
+								data[ stride + 1 ] = color.g;
+								data[ stride + 2 ] = color.b;
+								data[ stride + 3 ] = color.a;
 
 							}
 
-							texture = new THREE.DataTexture( data, width, height, useAlpha === true ? THREE.RGBAFormat : THREE.RGBFormat );
+							texture = new THREE.DataTexture( data, width, height );
 							texture.needsUpdate = true;
 							texture.__type = textureType; // needed for material modifications
 

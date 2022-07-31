@@ -8,6 +8,7 @@
 				opacity: 0,
 				transparent: true
 			} ) );
+			this.isLensflare = true;
 			this.type = 'Lensflare';
 			this.frustumCulled = false;
 			this.renderOrder = Infinity; //
@@ -15,8 +16,8 @@
 			const positionScreen = new THREE.Vector3();
 			const positionView = new THREE.Vector3(); // textures
 
-			const tempMap = new THREE.FramebufferTexture( 16, 16, THREE.RGBFormat );
-			const occlusionMap = new THREE.FramebufferTexture( 16, 16, THREE.RGBFormat ); // material
+			const tempMap = new THREE.FramebufferTexture( 16, 16, THREE.RGBAFormat );
+			const occlusionMap = new THREE.FramebufferTexture( 16, 16, THREE.RGBAFormat ); // material
 
 			const geometry = Lensflare.Geometry;
 			const material1a = new THREE.RawShaderMaterial( {
@@ -232,9 +233,8 @@
 
 		}
 
-	}
+	} //
 
-	Lensflare.prototype.isLensflare = true; //
 
 	class LensflareElement {
 

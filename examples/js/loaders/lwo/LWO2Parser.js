@@ -1,19 +1,19 @@
 ( function () {
 
-	function LWO2Parser( IFFParser ) {
+	class LWO2Parser {
 
-		this.IFF = IFFParser;
+		constructor( IFFParser ) {
 
-	}
+			this.IFF = IFFParser;
 
-	LWO2Parser.prototype = {
-		constructor: LWO2Parser,
-		parseBlock: function () {
+		}
+
+		parseBlock() {
 
 			this.IFF.debugger.offset = this.IFF.reader.offset;
 			this.IFF.debugger.closeForms();
-			var blockID = this.IFF.reader.getIDTag();
-			var length = this.IFF.reader.getUint32(); // size of data in bytes
+			const blockID = this.IFF.reader.getIDTag();
+			let length = this.IFF.reader.getUint32(); // size of data in bytes
 
 			if ( length > this.IFF.reader.dv.byteLength - this.IFF.reader.offset ) {
 
@@ -247,7 +247,7 @@
 					break;
 
 				case 'IMAG':
-					var index = this.IFF.reader.getVariableLengthIndex();
+					const index = this.IFF.reader.getVariableLengthIndex();
 					this.IFF.currentForm.imageIndex = index;
 					break;
 					// Texture Mapping Form
@@ -315,7 +315,7 @@
 					// LWO2 Spec chunks: these are needed since the SURF FORMs are often in LWO2 format
 
 				case 'SMAN':
-					var maxSmoothingAngle = this.IFF.reader.getFloat32();
+					const maxSmoothingAngle = this.IFF.reader.getFloat32();
 					this.IFF.currentSurface.attributes.smooth = maxSmoothingAngle < 0 ? false : true;
 					break;
 					// LWO2: Basic Surface Parameters
@@ -440,7 +440,8 @@
 			}
 
 		}
-	};
+
+	}
 
 	THREE.LWO2Parser = LWO2Parser;
 

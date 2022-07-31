@@ -1,24 +1,26 @@
 import { WebGLUniforms } from './WebGLUniforms.js';
 import { WebGLShader } from './WebGLShader.js';
 import { ShaderChunk } from '../shaders/ShaderChunk.js';
-import { RGBFormat, NoToneMapping, AddOperation, MixOperation, MultiplyOperation, CubeRefractionMapping, CubeUVRefractionMapping, CubeUVReflectionMapping, CubeReflectionMapping, PCFSoftShadowMap, PCFShadowMap, VSMShadowMap, ACESFilmicToneMapping, CineonToneMapping, CustomToneMapping, ReinhardToneMapping, LinearToneMapping, sRGBEncoding, LinearEncoding, GLSL3 } from '../../constants.js';
-
-// From https://www.khronos.org/registry/webgl/extensions/KHR_parallel_shader_compile/
-const COMPLETION_STATUS_KHR = 0x91B1;
+import { NoToneMapping, AddOperation, MixOperation, MultiplyOperation, CubeRefractionMapping, CubeUVReflectionMapping, CubeReflectionMapping, PCFSoftShadowMap, PCFShadowMap, VSMShadowMap, ACESFilmicToneMapping, CineonToneMapping, CustomToneMapping, ReinhardToneMapping, LinearToneMapping, sRGBEncoding, LinearEncoding, GLSL3 } from '../../constants.js';
 
 let programIdCount = 0;
 
-function addLineNumbers( string ) {
+function handleSource( string, errorLine ) {
 
 	const lines = string.split( '\n' );
+	const lines2 = [];
 
-	for ( let i = 0; i < lines.length; i ++ ) {
+	const from = Math.max( errorLine - 6, 0 );
+	const to = Math.min( errorLine + 6, lines.length );
 
-		lines[ i ] = ( i + 1 ) + ': ' + lines[ i ];
+	for ( let i = from; i < to; i ++ ) {
+
+		const line = i + 1;
+		lines2.push( `${line === errorLine ? '>' : ' '} ${line}: ${lines[ i ]}` );
 
 	}
 
-	return lines.join( '\n' );
+	return lines2.join( '\n' );
 
 }
 
@@ -45,17 +47,20 @@ function getShaderErrors( gl, shader, type ) {
 
 	if ( status && errors === '' ) return '';
 
-	// --enable-privileged-webgl-extension
-	// console.log( '**' + type + '**', gl.getExtension( 'WEBGL_debug_shaders' ).getTranslatedShaderSource( shader ) );
+	const errorMatches = /ERROR: 0:(\d+)/.exec( errors );
+	if ( errorMatches ) {
 
-	return type.toUpperCase() + '\n\n' + errors + '\n\n' + addLineNumbers( gl.getShaderSource( shader ) );
+		// --enable-privileged-webgl-extension
+		// console.log( '**' + type + '**', gl.getExtension( 'WEBGL_debug_shaders' ).getTranslatedShaderSource( shader ) );
 
-}
+		const errorLine = parseInt( errorMatches[ 1 ] );
+		return type.toUpperCase() + '\n\n' + errors + '\n\n' + handleSource( gl.getShaderSource( shader ), errorLine );
 
-function getTexelDecodingFunction( functionName, encoding ) {
+	} else {
 
-	const components = getEncodingComponents( encoding );
-	return 'vec4 ' + functionName + '( vec4 value ) { return ' + components[ 0 ] + 'ToLinear' + components[ 1 ] + '; }';
+		return errors;
+
+	}
 
 }
 
@@ -105,7 +110,7 @@ function getToneMappingFunction( functionName, toneMapping ) {
 function generateExtensions( parameters ) {
 
 	const chunks = [
-		( parameters.extensionDerivatives || parameters.envMapCubeUV || parameters.bumpMap || parameters.tangentSpaceNormalMap || parameters.clearcoatNormalMap || parameters.flatShading || parameters.shaderID === 'physical' ) ? '#extension GL_OES_standard_derivatives : enable' : '',
+		( parameters.extensionDerivatives || !! parameters.envMapCubeUVHeight || parameters.bumpMap || parameters.tangentSpaceNormalMap || parameters.clearcoatNormalMap || parameters.flatShading || parameters.shaderID === 'physical' ) ? '#extension GL_OES_standard_derivatives : enable' : '',
 		( parameters.extensionFragDepth || parameters.logarithmicDepthBuffer ) && parameters.rendererExtensionFragDepth ? '#extension GL_EXT_frag_depth : enable' : '',
 		( parameters.extensionDrawBuffers && parameters.rendererExtensionDrawBuffers ) ? '#extension GL_EXT_draw_buffers : require' : '',
 		( parameters.extensionShaderTextureLOD || parameters.envMap || parameters.transmission ) && parameters.rendererExtensionShaderTextureLod ? '#extension GL_EXT_shader_texture_lod : enable' : ''
@@ -311,7 +316,6 @@ function generateEnvMapTypeDefine( parameters ) {
 				break;
 
 			case CubeUVReflectionMapping:
-			case CubeUVRefractionMapping:
 				envMapTypeDefine = 'ENVMAP_TYPE_CUBE_UV';
 				break;
 
@@ -332,7 +336,6 @@ function generateEnvMapModeDefine( parameters ) {
 		switch ( parameters.envMapMode ) {
 
 			case CubeRefractionMapping:
-			case CubeUVRefractionMapping:
 
 				envMapModeDefine = 'ENVMAP_MODE_REFRACTION';
 				break;
@@ -373,6 +376,22 @@ function generateEnvMapBlendingDefine( parameters ) {
 
 }
 
+function generateCubeUVSize( parameters ) {
+
+	const imageHeight = parameters.envMapCubeUVHeight;
+
+	if ( imageHeight === null ) return null;
+
+	const maxMip = Math.log2( imageHeight ) - 2;
+
+	const texelHeight = 1.0 / imageHeight;
+
+	const texelWidth = 1.0 / ( 3 * Math.max( Math.pow( 2, maxMip ), 7 * 16 ) );
+
+	return { texelWidth, texelHeight, maxMip };
+
+}
+
 function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 
 	// TODO Send this event to Three.js DevTools
@@ -389,6 +408,7 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 	const envMapTypeDefine = generateEnvMapTypeDefine( parameters );
 	const envMapModeDefine = generateEnvMapModeDefine( parameters );
 	const envMapBlendingDefine = generateEnvMapBlendingDefine( parameters );
+	const envMapCubeUVSize = generateCubeUVSize( parameters );
 
 	const customExtensions = parameters.isWebGL2 ? '' : generateExtensions( parameters );
 
@@ -441,7 +461,6 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 
 			parameters.supportsVertexTextures ? '#define VERTEX_TEXTURES' : '',
 
-			'#define MAX_BONES ' + parameters.maxBones,
 			( parameters.useFog && parameters.fog ) ? '#define USE_FOG' : '',
 			( parameters.useFog && parameters.fogExp2 ) ? '#define FOG_EXP2' : '',
 
@@ -459,6 +478,9 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			parameters.clearcoatMap ? '#define USE_CLEARCOATMAP' : '',
 			parameters.clearcoatRoughnessMap ? '#define USE_CLEARCOAT_ROUGHNESSMAP' : '',
 			parameters.clearcoatNormalMap ? '#define USE_CLEARCOAT_NORMALMAP' : '',
+
+			parameters.iridescenceMap ? '#define USE_IRIDESCENCEMAP' : '',
+			parameters.iridescenceThicknessMap ? '#define USE_IRIDESCENCE_THICKNESSMAP' : '',
 
 			parameters.displacementMap && parameters.supportsVertexTextures ? '#define USE_DISPLACEMENTMAP' : '',
 
@@ -486,12 +508,13 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			parameters.flatShading ? '#define FLAT_SHADED' : '',
 
 			parameters.skinning ? '#define USE_SKINNING' : '',
-			parameters.useVertexTexture ? '#define BONE_TEXTURE' : '',
 
 			parameters.morphTargets ? '#define USE_MORPHTARGETS' : '',
 			parameters.morphNormals && parameters.flatShading === false ? '#define USE_MORPHNORMALS' : '',
-			( parameters.morphTargets && parameters.isWebGL2 ) ? '#define MORPHTARGETS_TEXTURE' : '',
-			( parameters.morphTargets && parameters.isWebGL2 ) ? '#define MORPHTARGETS_COUNT ' + parameters.morphTargetsCount : '',
+			( parameters.morphColors && parameters.isWebGL2 ) ? '#define USE_MORPHCOLORS' : '',
+			( parameters.morphTargetsCount > 0 && parameters.isWebGL2 ) ? '#define MORPHTARGETS_TEXTURE' : '',
+			( parameters.morphTargetsCount > 0 && parameters.isWebGL2 ) ? '#define MORPHTARGETS_TEXTURE_STRIDE ' + parameters.morphTextureStride : '',
+			( parameters.morphTargetsCount > 0 && parameters.isWebGL2 ) ? '#define MORPHTARGETS_COUNT ' + parameters.morphTargetsCount : '',
 			parameters.doubleSided ? '#define DOUBLE_SIDED' : '',
 			parameters.flipSided ? '#define FLIP_SIDED' : '',
 
@@ -598,6 +621,9 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			parameters.envMap ? '#define ' + envMapTypeDefine : '',
 			parameters.envMap ? '#define ' + envMapModeDefine : '',
 			parameters.envMap ? '#define ' + envMapBlendingDefine : '',
+			envMapCubeUVSize ? '#define CUBEUV_TEXEL_WIDTH ' + envMapCubeUVSize.texelWidth : '',
+			envMapCubeUVSize ? '#define CUBEUV_TEXEL_HEIGHT ' + envMapCubeUVSize.texelHeight : '',
+			envMapCubeUVSize ? '#define CUBEUV_MAX_MIP ' + envMapCubeUVSize.maxMip + '.0' : '',
 			parameters.lightMap ? '#define USE_LIGHTMAP' : '',
 			parameters.aoMap ? '#define USE_AOMAP' : '',
 			parameters.emissiveMap ? '#define USE_EMISSIVEMAP' : '',
@@ -610,6 +636,10 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			parameters.clearcoatMap ? '#define USE_CLEARCOATMAP' : '',
 			parameters.clearcoatRoughnessMap ? '#define USE_CLEARCOAT_ROUGHNESSMAP' : '',
 			parameters.clearcoatNormalMap ? '#define USE_CLEARCOAT_NORMALMAP' : '',
+
+			parameters.iridescence ? '#define USE_IRIDESCENCE' : '',
+			parameters.iridescenceMap ? '#define USE_IRIDESCENCEMAP' : '',
+			parameters.iridescenceThicknessMap ? '#define USE_IRIDESCENCE_THICKNESSMAP' : '',
 
 			parameters.specularMap ? '#define USE_SPECULARMAP' : '',
 			parameters.specularIntensityMap ? '#define USE_SPECULARINTENSITYMAP' : '',
@@ -627,6 +657,8 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			parameters.transmission ? '#define USE_TRANSMISSION' : '',
 			parameters.transmissionMap ? '#define USE_TRANSMISSIONMAP' : '',
 			parameters.thicknessMap ? '#define USE_THICKNESSMAP' : '',
+
+			parameters.decodeVideoTexture ? '#define DECODE_VIDEO_TEXTURE' : '',
 
 			parameters.vertexTangents ? '#define USE_TANGENT' : '',
 			parameters.vertexColors || parameters.instancingColor ? '#define USE_COLOR' : '',
@@ -651,8 +683,6 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			parameters.logarithmicDepthBuffer ? '#define USE_LOGDEPTHBUF' : '',
 			( parameters.logarithmicDepthBuffer && parameters.rendererExtensionFragDepth ) ? '#define USE_LOGDEPTHBUF_EXT' : '',
 
-			( ( parameters.extensionShaderTextureLOD || parameters.envMap ) && parameters.rendererExtensionShaderTextureLod ) ? '#define TEXTURE_LOD_EXT' : '',
-
 			'uniform mat4 viewMatrix;',
 			'uniform vec3 cameraPosition;',
 			'uniform bool isOrthographic;',
@@ -662,19 +692,12 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 			( parameters.toneMapping !== NoToneMapping ) ? getToneMappingFunction( 'toneMapping', parameters.toneMapping ) : '',
 
 			parameters.dithering ? '#define DITHERING' : '',
-			parameters.format === RGBFormat ? '#define OPAQUE' : '',
+			parameters.opaque ? '#define OPAQUE' : '',
 
 			ShaderChunk[ 'encodings_pars_fragment' ], // this code is required here because it is used by the various encoding/decoding function defined below
-			parameters.map ? getTexelDecodingFunction( 'mapTexelToLinear', parameters.mapEncoding ) : '',
-			parameters.matcap ? getTexelDecodingFunction( 'matcapTexelToLinear', parameters.matcapEncoding ) : '',
-			parameters.envMap ? getTexelDecodingFunction( 'envMapTexelToLinear', parameters.envMapEncoding ) : '',
-			parameters.emissiveMap ? getTexelDecodingFunction( 'emissiveMapTexelToLinear', parameters.emissiveMapEncoding ) : '',
-			parameters.specularColorMap ? getTexelDecodingFunction( 'specularColorMapTexelToLinear', parameters.specularColorMapEncoding ) : '',
-			parameters.sheenColorMap ? getTexelDecodingFunction( 'sheenColorMapTexelToLinear', parameters.sheenColorMapEncoding ) : '',
-			parameters.lightMap ? getTexelDecodingFunction( 'lightMapTexelToLinear', parameters.lightMapEncoding ) : '',
 			getTexelEncodingFunction( 'linearToOutputTexel', parameters.outputEncoding ),
 
-			parameters.depthPacking ? '#define DEPTH_PACKING ' + parameters.depthPacking : '',
+			parameters.useDepthPacking ? '#define DEPTH_PACKING ' + parameters.depthPacking : '',
 
 			'\n'
 
@@ -751,84 +774,77 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 
 	gl.linkProgram( program );
 
-	function onFirstUse() {
+	// check for link errors
+	if ( renderer.debug.checkShaderErrors ) {
 
-		// check for link errors
-		if ( renderer.debug.checkShaderErrors ) {
+		const programLog = gl.getProgramInfoLog( program ).trim();
+		const vertexLog = gl.getShaderInfoLog( glVertexShader ).trim();
+		const fragmentLog = gl.getShaderInfoLog( glFragmentShader ).trim();
 
-			const programLog = gl.getProgramInfoLog( program ).trim();
-			const vertexLog = gl.getShaderInfoLog( glVertexShader ).trim();
-			const fragmentLog = gl.getShaderInfoLog( glFragmentShader ).trim();
+		let runnable = true;
+		let haveDiagnostics = true;
 
-			let runnable = true;
-			let haveDiagnostics = true;
+		if ( gl.getProgramParameter( program, gl.LINK_STATUS ) === false ) {
 
-			if ( gl.getProgramParameter( program, gl.LINK_STATUS ) === false ) {
+			runnable = false;
 
-				runnable = false;
+			const vertexErrors = getShaderErrors( gl, glVertexShader, 'vertex' );
+			const fragmentErrors = getShaderErrors( gl, glFragmentShader, 'fragment' );
 
-				const vertexErrors = getShaderErrors( gl, glVertexShader, 'vertex' );
-				const fragmentErrors = getShaderErrors( gl, glFragmentShader, 'fragment' );
+			console.error(
+				'THREE.WebGLProgram: Shader Error ' + gl.getError() + ' - ' +
+				'VALIDATE_STATUS ' + gl.getProgramParameter( program, gl.VALIDATE_STATUS ) + '\n\n' +
+				'Program Info Log: ' + programLog + '\n' +
+				vertexErrors + '\n' +
+				fragmentErrors
+			);
 
-				console.error(
-					'THREE.WebGLProgram: Shader Error ' + gl.getError() + ' - ' +
-					'VALIDATE_STATUS ' + gl.getProgramParameter( program, gl.VALIDATE_STATUS ) + '\n\n' +
-					'Program Info Log: ' + programLog + '\n' +
-					vertexErrors + '\n' +
-					fragmentErrors
-				);
+		} else if ( programLog !== '' ) {
 
-			} else if ( programLog !== '' ) {
+			console.warn( 'THREE.WebGLProgram: Program Info Log:', programLog );
 
-				console.warn( 'THREE.WebGLProgram: Program Info Log:', programLog );
+		} else if ( vertexLog === '' || fragmentLog === '' ) {
 
-			} else if ( vertexLog === '' || fragmentLog === '' ) {
-
-				haveDiagnostics = false;
-
-			}
-
-			if ( haveDiagnostics ) {
-
-				this.diagnostics = {
-
-					runnable: runnable,
-
-					programLog: programLog,
-
-					vertexShader: {
-
-						log: vertexLog,
-						prefix: prefixVertex
-
-					},
-
-					fragmentShader: {
-
-						log: fragmentLog,
-						prefix: prefixFragment
-
-					}
-
-				};
-
-			}
+			haveDiagnostics = false;
 
 		}
 
-		// Clean up
+		if ( haveDiagnostics ) {
 
-		// Crashes in iOS9 and iOS10. #18402
-		// gl.detachShader( program, glVertexShader );
-		// gl.detachShader( program, glFragmentShader );
+			this.diagnostics = {
 
-		gl.deleteShader( glVertexShader );
-		gl.deleteShader( glFragmentShader );
+				runnable: runnable,
 
-		cachedUniforms = new WebGLUniforms( gl, program );
-		cachedAttributes = fetchAttributeLocations( gl, program );
+				programLog: programLog,
+
+				vertexShader: {
+
+					log: vertexLog,
+					prefix: prefixVertex
+
+				},
+
+				fragmentShader: {
+
+					log: fragmentLog,
+					prefix: prefixFragment
+
+				}
+
+			};
+
+		}
 
 	}
+
+	// Clean up
+
+	// Crashes in iOS9 and iOS10. #18402
+	// gl.detachShader( program, glVertexShader );
+	// gl.detachShader( program, glFragmentShader );
+
+	gl.deleteShader( glVertexShader );
+	gl.deleteShader( glFragmentShader );
 
 	// set up caching for uniform locations
 
@@ -838,8 +854,7 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 
 		if ( cachedUniforms === undefined ) {
 
-			// Populates cachedUniforms and cachedAttributes
-			onFirstUse.call(this);
+			cachedUniforms = new WebGLUniforms( gl, program );
 
 		}
 
@@ -855,30 +870,11 @@ function WebGLProgram( renderer, cacheKey, parameters, bindingStates ) {
 
 		if ( cachedAttributes === undefined ) {
 
-			// Populates cachedAttributes and cachedUniforms
-			onFirstUse.call(this);
+			cachedAttributes = fetchAttributeLocations( gl, program );
 
 		}
 
 		return cachedAttributes;
-
-	};
-
-	// indicate when the program is ready to be used
-
-	// if the KHR_parallel_shader_compile extension isn't supported, flag the
-	// program as ready immediately. It may cause a stall when it's first used.
-	let programReady = ! parameters.rendererExtensionParallelShaderCompile;
-
-	this.isReady = function () {
-
-		if ( ! programReady ) {
-
-			programReady = gl.getProgramParameter( program, COMPLETION_STATUS_KHR );
-
-		}
-
-		return programReady;
 
 	};
 

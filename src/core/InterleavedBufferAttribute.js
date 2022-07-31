@@ -7,6 +7,8 @@ class InterleavedBufferAttribute {
 
 	constructor( interleavedBuffer, itemSize, offset, normalized = false ) {
 
+		this.isInterleavedBufferAttribute = true;
+
 		this.name = '';
 
 		this.data = interleavedBuffer;
@@ -39,9 +41,7 @@ class InterleavedBufferAttribute {
 
 		for ( let i = 0, l = this.data.count; i < l; i ++ ) {
 
-			_vector.x = this.getX( i );
-			_vector.y = this.getY( i );
-			_vector.z = this.getZ( i );
+			_vector.fromBufferAttribute( this, i );
 
 			_vector.applyMatrix4( m );
 
@@ -57,9 +57,7 @@ class InterleavedBufferAttribute {
 
 		for ( let i = 0, l = this.count; i < l; i ++ ) {
 
-			_vector.x = this.getX( i );
-			_vector.y = this.getY( i );
-			_vector.z = this.getZ( i );
+			_vector.fromBufferAttribute( this, i );
 
 			_vector.applyNormalMatrix( m );
 
@@ -75,9 +73,7 @@ class InterleavedBufferAttribute {
 
 		for ( let i = 0, l = this.count; i < l; i ++ ) {
 
-			_vector.x = this.getX( i );
-			_vector.y = this.getY( i );
-			_vector.z = this.getZ( i );
+			_vector.fromBufferAttribute( this, i );
 
 			_vector.transformDirection( m );
 
@@ -185,7 +181,7 @@ class InterleavedBufferAttribute {
 
 		if ( data === undefined ) {
 
-			console.log( 'THREE.InterleavedBufferAttribute.clone(): Cloning an interlaved buffer attribute will deinterleave buffer data.' );
+			console.log( 'THREE.InterleavedBufferAttribute.clone(): Cloning an interleaved buffer attribute will deinterleave buffer data.' );
 
 			const array = [];
 
@@ -227,7 +223,7 @@ class InterleavedBufferAttribute {
 
 		if ( data === undefined ) {
 
-			console.log( 'THREE.InterleavedBufferAttribute.toJSON(): Serializing an interlaved buffer attribute will deinterleave buffer data.' );
+			console.log( 'THREE.InterleavedBufferAttribute.toJSON(): Serializing an interleaved buffer attribute will deinterleave buffer data.' );
 
 			const array = [];
 
@@ -254,7 +250,7 @@ class InterleavedBufferAttribute {
 
 		} else {
 
-			// save as true interlaved attribtue
+			// save as true interleaved attribtue
 
 			if ( data.interleavedBuffers === undefined ) {
 
@@ -281,8 +277,6 @@ class InterleavedBufferAttribute {
 	}
 
 }
-
-InterleavedBufferAttribute.prototype.isInterleavedBufferAttribute = true;
 
 
 export { InterleavedBufferAttribute };

@@ -3,7 +3,7 @@ import {
 	Loader,
 	Matrix4,
 	Vector3
-} from '../../../build/three.module.js';
+} from 'three';
 import * as fflate from '../libs/fflate.module.js';
 import { Volume } from '../misc/Volume.js';
 
@@ -173,8 +173,7 @@ class NRRDLoader extends Loader {
 
 					headerObject.isNrrd = true;
 
-				} else if ( l.match( /^#/ ) ) {
-				} else if ( m = l.match( /(.*):(.*)/ ) ) {
+				} else if ( ! l.match( /^#/ ) && ( m = l.match( /(.*):(.*)/ ) ) ) {
 
 					field = m[ 1 ].trim();
 					data = m[ 2 ].trim();

@@ -53,12 +53,13 @@
 
 				if ( node.nodeType !== 1 ) return;
 				const transform = getNodeTransform( node );
-				let traverseChildNodes = true;
+				let isDefsNode = false;
 				let path = null;
 
 				switch ( node.nodeName ) {
 
 					case 'svg':
+						style = parseStyle( node, style );
 						break;
 
 					case 'style':
@@ -105,12 +106,13 @@
 						break;
 
 					case 'defs':
-						traverseChildNodes = false;
+						isDefsNode = true;
 						break;
 
 					case 'use':
 						style = parseStyle( node, style );
-						const usedNodeId = node.href.baseVal.substring( 1 );
+						const href = node.getAttributeNS( 'http://www.w3.org/1999/xlink', 'href' ) || '';
+						const usedNodeId = href.substring( 1 );
 						const usedNode = node.viewportElement.getElementById( usedNodeId );
 
 						if ( usedNode ) {
@@ -146,15 +148,22 @@
 
 				}
 
-				if ( traverseChildNodes ) {
+				const childNodes = node.childNodes;
 
-					const nodes = node.childNodes;
+				for ( let i = 0; i < childNodes.length; i ++ ) {
 
-					for ( let i = 0; i < nodes.length; i ++ ) {
+					const node = childNodes[ i ];
 
-						parseNode( nodes[ i ], style );
+					if ( isDefsNode && node.nodeName !== 'style' && node.nodeName !== 'defs' ) {
+
+						// Ignore everything in defs except CSS style definitions
+						// and nested defs, because it is OK by the standard to have
+						// <style/> there.
+						continue;
 
 					}
+
+					parseNode( node, style );
 
 				}
 
@@ -192,7 +201,7 @@
 
 					const command = commands[ i ];
 					const type = command.charAt( 0 );
-					const data = command.substr( 1 ).trim();
+					const data = command.slice( 1 ).trim();
 
 					if ( isFirstPoint === true ) {
 
@@ -560,7 +569,9 @@
 
 					for ( let j = 0; j < selectorList.length; j ++ ) {
 
-						stylesheets[ selectorList[ j ] ] = Object.assign( stylesheets[ selectorList[ j ] ] || {}, stylesheet.style );
+						// Remove empty rules
+						const definitions = Object.fromEntries( Object.entries( stylesheet.style ).filter( ( [ , v ] ) => v !== '' ) );
+						stylesheets[ selectorList[ j ] ] = Object.assign( stylesheets[ selectorList[ j ] ] || {}, definitions );
 
 					}
 
@@ -1258,8 +1269,8 @@
 
 						if ( openParPos > 0 && openParPos < closeParPos ) {
 
-							const transformType = transformText.substr( 0, openParPos );
-							const array = parseFloats( transformText.substr( openParPos + 1, closeParPos - openParPos - 1 ) );
+							const transformType = transformText.slice( 0, openParPos );
+							const array = parseFloats( transformText.slice( openParPos + 1 ) );
 							currentTransform.identity();
 
 							switch ( transformType ) {
@@ -2078,7 +2089,7 @@
 					tempV2_3.normalize();
 					const dot = Math.abs( normal1.dot( tempV2_3 ) ); // If path is straight, don't create join
 
-					if ( dot !== 0 ) {
+					if ( dot > Number.EPSILON ) {
 
 						// Compute inner and outer segment intersections
 						const miterSide = strokeWidth2 / dot;

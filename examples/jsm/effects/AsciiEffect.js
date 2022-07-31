@@ -14,14 +14,13 @@ class AsciiEffect {
 
 		// Some ASCII settings
 
-		const bResolution = ! options[ 'resolution' ] ? 0.15 : options[ 'resolution' ]; // Higher for more details
-		const iScale = ! options[ 'scale' ] ? 1 : options[ 'scale' ];
-		const bColor = ! options[ 'color' ] ? false : options[ 'color' ]; // nice but slows down rendering!
-		const bAlpha = ! options[ 'alpha' ] ? false : options[ 'alpha' ]; // Transparency
-		const bBlock = ! options[ 'block' ] ? false : options[ 'block' ]; // blocked characters. like good O dos
-		const bInvert = ! options[ 'invert' ] ? false : options[ 'invert' ]; // black is white, white is black
-
-		const strResolution = 'low';
+		const fResolution = options[ 'resolution' ] || 0.15; // Higher for more details
+		const iScale = options[ 'scale' ] || 1;
+		const bColor = options[ 'color' ] || false; // nice but slows down rendering!
+		const bAlpha = options[ 'alpha' ] || false; // Transparency
+		const bBlock = options[ 'block' ] || false; // blocked characters. like good O dos
+		const bInvert = options[ 'invert' ] || false; // black is white, white is black
+		const strResolution = options[ 'strResolution' ] || 'low';
 
 		let width, height;
 
@@ -49,7 +48,7 @@ class AsciiEffect {
 		this.render = function ( scene, camera ) {
 
 			renderer.render( scene, camera );
-			asciifyImage( renderer, oAscii );
+			asciifyImage( oAscii );
 
 		};
 
@@ -122,18 +121,6 @@ class AsciiEffect {
 
 		if ( charSet ) aCharList = charSet;
 
-		let fResolution = 0.5;
-
-		switch ( strResolution ) {
-
-			case 'low' : 	fResolution = 0.25; break;
-			case 'medium' : fResolution = 0.5; break;
-			case 'high' : 	fResolution = 1; break;
-
-		}
-
-		if ( bResolution ) fResolution = bResolution;
-
 		// Setup dom
 
 		const fFontSize = ( 2 / fResolution ) * iScale;
@@ -191,7 +178,7 @@ class AsciiEffect {
 
 		// convert img element to ascii
 
-		function asciifyImage( canvasRenderer, oAscii ) {
+		function asciifyImage( oAscii ) {
 
 			oCtx.clearRect( 0, 0, iWidth, iHeight );
 			oCtx.drawImage( oCanvasImg, 0, 0, iWidth, iHeight );

@@ -40,7 +40,7 @@ import {
 	Vector4,
 	VectorKeyframeTrack,
 	sRGBEncoding
-} from '../../../build/three.module.js';
+} from 'three';
 import * as fflate from '../libs/fflate.module.js';
 import { NURBSCurve } from '../curves/NURBSCurve.js';
 
@@ -386,6 +386,15 @@ class FBXTreeParser {
 
 			texture.repeat.x = values[ 0 ];
 			texture.repeat.y = values[ 1 ];
+
+		}
+
+		if ( 'Translation' in textureNode ) {
+
+			const values = textureNode.Translation.value;
+
+			texture.offset.x = values[ 0 ];
+			texture.offset.y = values[ 1 ];
 
 		}
 
@@ -3554,6 +3563,8 @@ class BinaryParser {
 						return reader2.getInt64Array( arrayLength );
 
 				}
+
+				break; // cannot happen but is required by the DeepScan
 
 			default:
 				throw new Error( 'THREE.FBXLoader: Unknown property type ' + type );

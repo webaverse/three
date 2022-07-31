@@ -40,6 +40,7 @@
 
 			}
 
+			this.isTransformControls = true;
 			this.visible = false;
 			this.domElement = domElement;
 			this.domElement.style.touchAction = 'none'; // disable touch scroll
@@ -180,7 +181,17 @@
 
 			this.camera.updateMatrixWorld();
 			this.camera.matrixWorld.decompose( this.cameraPosition, this.cameraQuaternion, this._cameraScale );
-			this.eye.copy( this.cameraPosition ).sub( this.worldPosition ).normalize();
+
+			if ( this.camera.isOrthographicCamera ) {
+
+				this.camera.getWorldDirection( this.eye );
+
+			} else {
+
+				this.eye.copy( this.cameraPosition ).sub( this.worldPosition ).normalize();
+
+			}
+
 			super.updateMatrixWorld( this );
 
 		}
@@ -604,9 +615,8 @@
 
 		}
 
-	}
+	} // mouse / touch event handlers
 
-	TransformControls.prototype.isTransformControls = true; // mouse / touch event handlers
 
 	function getPointer( event ) {
 
@@ -731,6 +741,7 @@
 		constructor() {
 
 			super();
+			this.isTransformControlsGizmo = true;
 			this.type = 'TransformControlsGizmo'; // shared materials
 
 			const gizmoMaterial = new THREE.MeshBasicMaterial( {
@@ -1259,9 +1270,8 @@
 
 		}
 
-	}
+	} //
 
-	TransformControlsGizmo.prototype.isTransformControlsGizmo = true; //
 
 	class TransformControlsPlane extends THREE.Mesh {
 
@@ -1275,6 +1285,7 @@
 				opacity: 0.1,
 				toneMapped: false
 			} ) );
+			this.isTransformControlsPlane = true;
 			this.type = 'TransformControlsPlane';
 
 		}
@@ -1373,8 +1384,6 @@
 		}
 
 	}
-
-	TransformControlsPlane.prototype.isTransformControlsPlane = true;
 
 	THREE.TransformControls = TransformControls;
 	THREE.TransformControlsGizmo = TransformControlsGizmo;

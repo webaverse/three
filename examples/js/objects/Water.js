@@ -12,6 +12,7 @@
 		constructor( geometry, options = {} ) {
 
 			super( geometry );
+			this.isWater = true;
 			const scope = this;
 			const textureWidth = options.textureWidth !== undefined ? options.textureWidth : 512;
 			const textureHeight = options.textureHeight !== undefined ? options.textureHeight : 512;
@@ -39,19 +40,7 @@
 			const q = new THREE.Vector4();
 			const textureMatrix = new THREE.Matrix4();
 			const mirrorCamera = new THREE.PerspectiveCamera();
-			const parameters = {
-				minFilter: THREE.LinearFilter,
-				magFilter: THREE.LinearFilter,
-				format: THREE.RGBFormat
-			};
-			const renderTarget = new THREE.WebGLRenderTarget( textureWidth, textureHeight, parameters );
-
-			if ( ! THREE.MathUtils.isPowerOfTwo( textureWidth ) || ! THREE.MathUtils.isPowerOfTwo( textureHeight ) ) {
-
-				renderTarget.texture.generateMipmaps = false;
-
-			}
-
+			const renderTarget = new THREE.WebGLRenderTarget( textureWidth, textureHeight );
 			const mirrorShader = {
 				uniforms: THREE.UniformsUtils.merge( [ THREE.UniformsLib[ 'fog' ], THREE.UniformsLib[ 'lights' ], {
 					'normalSampler': {
@@ -292,8 +281,6 @@
 		}
 
 	}
-
-	Water.prototype.isWater = true;
 
 	THREE.Water = Water;
 
