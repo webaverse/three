@@ -202,7 +202,7 @@ function WebGLPrograms( renderer, cubemaps, cubeuvmaps, extensions, capabilities
 			numRectAreaLights: lights.rectArea.length,
 			numHemiLights: lights.hemi.length,
 
-			umDirLightShadows: object.receiveShadow ? lights.directionalShadowMap.length : 0,
+			numDirLightShadows: object.receiveShadow ? lights.directionalShadowMap.length : 0,
 			numPointLightShadows: object.receiveShadow ? lights.pointShadowMap.length : 0,
 			numSpotLightShadows: object.receiveShadow ? lights.spotShadowMap.length : 0,
 
