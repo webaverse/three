@@ -23,10 +23,31 @@ class Skeleton {
 		this.boneTexture = null;
 		this.boneTextureSize = 0;
 
+		this.referenceMatrixWorld = new Matrix4();
+		this.referenceMatrixWorldInverse = new Matrix4();
+
 		this.frame = - 1;
 
 		this.init();
 
+	}
+
+	setReferenceCoordinate( matrixWorld, matrixWorldInverse ) {
+		
+		this.referenceMatrixWorld.copy( matrixWorld );
+		this.referenceMatrixWorldInverse.copy( matrixWorldInverse );
+
+	}
+
+	_convertToReferenceLocal( matrix ) {
+
+		return this.referenceMatrixWorldInverse.clone().multiply( matrix );
+
+	}
+
+	_convertToWorld( matrix ) {
+
+		return this.referenceMatrixWorld.clone().multiply( matrix );
 	}
 
 	init() {
@@ -74,7 +95,7 @@ class Skeleton {
 
 			if ( this.bones[ i ] ) {
 
-				inverse.copy( this.bones[ i ].matrixWorld ).invert();
+				inverse.copy( this._convertToReferenceLocal( this.bones[ i ].matrixWorld ) ).invert();
 
 			}
 
@@ -94,7 +115,7 @@ class Skeleton {
 
 			if ( bone ) {
 
-				bone.matrixWorld.copy( this.boneInverses[ i ] ).invert();
+				bone.matrixWorld.copy( this._convertToWorld( this.boneInverses[ i ].clone().invert() ) );
 
 			}
 
@@ -110,12 +131,12 @@ class Skeleton {
 
 				if ( bone.parent && bone.parent.isBone ) {
 
-					bone.matrix.copy( bone.parent.matrixWorld ).invert();
-					bone.matrix.multiply( bone.matrixWorld );
+					bone.matrix.multiply( this._convertToReferenceLocal( bone.parent.matrixWorld ) ).invert();
+					bone.matrix.multiply( this._convertToReferenceLocal( bone.matrixWorld ) );
 
 				} else {
 
-					bone.matrix.copy( bone.matrixWorld );
+					bone.matrix.copy( this._convertToReferenceLocal( bone.matrixWorld ) );
 
 				}
 
@@ -140,7 +161,13 @@ class Skeleton {
 
 			// compute the offset between the current and the original transform
 
-			const matrix = bones[ i ] ? bones[ i ].matrixWorld : _identityMatrix;
+			const matrix = _identityMatrix;
+			
+			if ( bones[i] ) {
+
+				matrix.copy( this._convertToReferenceLocal( bones[ i ].matrixWorld ) );
+
+			}
 
 			_offsetMatrix.multiplyMatrices( matrix, boneInverses[ i ] );
 			_offsetMatrix.toArray( boneMatrices, i * 16 );

@@ -11,6 +11,8 @@ const _skinWeight = /*@__PURE__*/ new Vector4();
 const _vector = /*@__PURE__*/ new Vector3();
 const _matrix = /*@__PURE__*/ new Matrix4();
 
+const _identityMatrix = /*@__PURE__*/ new Matrix4();
+
 class SkinnedMesh extends Mesh {
 
 	constructor( geometry, material ) {
@@ -22,6 +24,8 @@ class SkinnedMesh extends Mesh {
 		this.bindMode = 'attached';
 		this.bindMatrix = new Matrix4();
 		this.bindMatrixInverse = new Matrix4();
+		this.parentMatrixWorld = new Matrix4();
+		this.parentMatrixWorldInverse = new Matrix4();
 
 	}
 
@@ -32,10 +36,30 @@ class SkinnedMesh extends Mesh {
 		this.bindMode = source.bindMode;
 		this.bindMatrix.copy( source.bindMatrix );
 		this.bindMatrixInverse.copy( source.bindMatrixInverse );
+		this.parentMatrixWorld.copy( source.parentMatrixWorld );
+		this.parentMatrixWorldInverse.copy( source.parentMatrixWorldInverse );
 
 		this.skeleton = source.skeleton;
 
 		return this;
+
+	}
+
+	_updateParentMatrix() {
+
+		if (this.parent === null) {
+
+			this.parentMatrixWorld.copy( _identityMatrix );
+
+		} else {
+
+			this.parentMatrixWorld.copy( this.parent.matrixWorld );
+
+		}
+
+		this.parentMatrixWorldInverse.copy( this.parentMatrixWorld ).invert();
+
+		this.skeleton.setReferenceCoordinate( this.parentMatrixWorld, this.parentMatrixWorldInverse );
 
 	}
 
@@ -49,7 +73,7 @@ class SkinnedMesh extends Mesh {
 
 			this.skeleton.calculateInverses();
 
-			bindMatrix = this.matrixWorld;
+			bindMatrix = this.matrix;
 
 		}
 
@@ -97,11 +121,16 @@ class SkinnedMesh extends Mesh {
 
 	updateMatrixWorld( force ) {
 
+		const parent = this.parent;
+		this.parent = null;
 		super.updateMatrixWorld( force );
+		this.parent = parent;
+		
+		this._updateParentMatrix();
 
 		if ( this.bindMode === 'attached' ) {
 
-			this.bindMatrixInverse.copy( this.matrixWorld ).invert();
+			this.bindMatrixInverse.copy( this.matrix ).invert();
 
 		} else if ( this.bindMode === 'detached' ) {
 
@@ -112,6 +141,8 @@ class SkinnedMesh extends Mesh {
 			console.warn( 'THREE.SkinnedMesh: Unrecognized bindMode: ' + this.bindMode );
 
 		}
+
+		this.matrixWorld.multiplyMatrices( this.parentMatrixWorld, this.matrix );
 
 	}
 
@@ -135,7 +166,10 @@ class SkinnedMesh extends Mesh {
 
 				const boneIndex = _skinIndex.getComponent( i );
 
-				_matrix.multiplyMatrices( skeleton.bones[ boneIndex ].matrixWorld, skeleton.boneInverses[ boneIndex ] );
+				_matrix.multiplyMatrices(
+					this.parentMatrixWorld,
+					skeleton.bones[ boneIndex ].matrixWorld
+					).multiply( skeleton.boneInverses[ boneIndex ] );
 
 				target.addScaledVector( _vector.copy( _basePosition ).applyMatrix4( _matrix ), weight );
 
