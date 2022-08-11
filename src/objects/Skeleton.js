@@ -23,7 +23,6 @@ class Skeleton {
 		this.boneTexture = null;
 		this.boneTextureSize = 0;
 
-		this.referenceMatrixWorld = new Matrix4();
 		this.referenceMatrixWorldInverse = new Matrix4();
 
 		this.frame = - 1;
@@ -33,8 +32,6 @@ class Skeleton {
 	}
 
 	_setReferenceMatrixWorld( matrixWorld ) {
-
-		this.referenceMatrixWorld.copy( matrixWorld );
 
 		this.referenceMatrixWorldInverse.copy( matrixWorld ).invert();
 
