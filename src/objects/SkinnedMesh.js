@@ -113,6 +113,10 @@ class SkinnedMesh extends Mesh {
 
 		}
 
+	}
+
+	applySkeletonTransform() {
+		
 		this.matrixWorld.copy( this.skeleton.referenceMatrixWorld );
 
 	}
