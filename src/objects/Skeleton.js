@@ -143,9 +143,9 @@ class Skeleton {
 
 	update() {
 		
-		if (this.bones[0].parent) {
+		if (this.bones[0]) {
 
-			this._setReferenceMatrixWorld( this.bones[0].parent.matrixWorld );
+			this._setReferenceMatrixWorld( this.bones[0].matrixWorld );
 
 		}
 
