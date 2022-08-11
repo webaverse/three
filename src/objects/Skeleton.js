@@ -76,6 +76,11 @@ class Skeleton {
 
 		}
 
+		this.root = bones[0];
+		if ( this.root.name === "Hips" && this.root.parent ) {
+			this.root = this.root.parent;
+		}
+
 	}
 
 	calculateInverses() {
@@ -143,9 +148,9 @@ class Skeleton {
 
 	update() {
 		
-		if (this.bones[0]) {
+		if (this.root) {
 
-			this._setReferenceMatrixWorld( this.bones[0].matrixWorld );
+			this._setReferenceMatrixWorld( this.root.matrixWorld );
 
 		}
 

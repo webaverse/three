@@ -29530,6 +29530,11 @@
 			 }
  
 		 }
+
+		 this.root = bones[0];
+		 if ( this.root.name === "Hips" && this.root.parent ) {
+			 this.root = this.root.parent;
+		 }
  
 	 }
  
@@ -29597,10 +29602,10 @@
 	 }
  
 	 update() {
- 		
-		 if (this.bones[0]) {
 
-			 this._setReferenceMatrixWorld( this.bones[0].matrixWorld );
+		 if (this.root) {
+
+			 this._setReferenceMatrixWorld( this.root.matrixWorld );
 
 		 }
 
