@@ -11,8 +11,6 @@ const _skinWeight = /*@__PURE__*/ new Vector4();
 const _vector = /*@__PURE__*/ new Vector3();
 const _matrix = /*@__PURE__*/ new Matrix4();
 
-const _identityMatrix = /*@__PURE__*/ new Matrix4();
-
 class SkinnedMesh extends Mesh {
 
 	constructor( geometry, material ) {
@@ -24,8 +22,6 @@ class SkinnedMesh extends Mesh {
 		this.bindMode = 'attached';
 		this.bindMatrix = new Matrix4();
 		this.bindMatrixInverse = new Matrix4();
-		this.parentMatrixWorld = new Matrix4();
-		this.parentMatrixWorldInverse = new Matrix4();
 
 	}
 
@@ -36,23 +32,11 @@ class SkinnedMesh extends Mesh {
 		this.bindMode = source.bindMode;
 		this.bindMatrix.copy( source.bindMatrix );
 		this.bindMatrixInverse.copy( source.bindMatrixInverse );
-		this.parentMatrixWorld.copy( source.parentMatrixWorld );
-		this.parentMatrixWorldInverse.copy( source.parentMatrixWorldInverse );
 
 		this.skeleton = source.skeleton;
 
 		return this;
 
-	}
-	
-	_updateParentMatrix() {
-
-		this.parentMatrixWorld.copy( this.skeleton.bones[0].parent.matrixWorld );
-
-		this.parentMatrixWorldInverse.copy( this.parentMatrixWorld ).invert();
-		
-		this.skeleton.setReferenceCoordinate( this.parentMatrixWorld, this.parentMatrixWorldInverse );
-		
 	}
 
 	bind( skeleton, bindMatrix ) {
@@ -65,7 +49,7 @@ class SkinnedMesh extends Mesh {
 
 			this.skeleton.calculateInverses();
 
-			bindMatrix = this.matrix;
+			bindMatrix = this.matrixWorld;
 
 		}
 
@@ -115,13 +99,9 @@ class SkinnedMesh extends Mesh {
 
 		super.updateMatrixWorld( force );
 
-		this._updateParentMatrix();
-
-		console.log('updateMatrixWorld', this.bindMatrix, this);
-
 		if ( this.bindMode === 'attached' ) {
 
-			this.bindMatrixInverse.copy( this.matrix ).invert();
+			this.bindMatrixInverse.copy( this.matrixWorld ).invert();
 
 		} else if ( this.bindMode === 'detached' ) {
 
@@ -133,7 +113,7 @@ class SkinnedMesh extends Mesh {
 
 		}
 
-		this.matrixWorld.copy( this.parentMatrixWorld );
+		this.matrixWorld.copy( this.skeleton.referenceMatrixWorld );
 
 	}
 
@@ -157,10 +137,7 @@ class SkinnedMesh extends Mesh {
 
 				const boneIndex = _skinIndex.getComponent( i );
 
-				_matrix.multiplyMatrices(
-					this.parentMatrixWorld,
-					skeleton.bones[ boneIndex ].matrixWorld
-					).multiply( skeleton.boneInverses[ boneIndex ] );
+				_matrix.multiplyMatrices( skeleton.bones[ boneIndex ].matrixWorld, skeleton.boneInverses[ boneIndex ] );
 
 				target.addScaledVector( _vector.copy( _basePosition ).applyMatrix4( _matrix ), weight );
 

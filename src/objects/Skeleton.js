@@ -32,22 +32,17 @@ class Skeleton {
 
 	}
 
-	setReferenceCoordinate( matrixWorld, matrixWorldInverse ) {
-		
+	_setReferenceMatrixWorld( matrixWorld ) {
+
 		this.referenceMatrixWorld.copy( matrixWorld );
-		this.referenceMatrixWorldInverse.copy( matrixWorldInverse );
+
+		this.referenceMatrixWorldInverse.copy( matrixWorld ).invert();
 
 	}
 
 	_convertToReferenceLocal( matrix ) {
 
 		return this.referenceMatrixWorldInverse.clone().multiply( matrix );
-
-	}
-
-	_convertToWorld( matrix ) {
-
-		return matrix.clone().multiply( this.referenceMatrixWorld );
 
 	}
 
@@ -96,7 +91,7 @@ class Skeleton {
 
 			if ( this.bones[ i ] ) {
 
-				inverse.copy( this._convertToReferenceLocal( this.bones[ i ].matrixWorld ) ).invert();
+				inverse.copy( this.bones[ i ].matrixWorld ).invert();
 
 			}
 
@@ -116,7 +111,7 @@ class Skeleton {
 
 			if ( bone ) {
 
-				bone.matrixWorld.copy( this._convertToWorld( this.boneInverses[ i ].clone().invert() ) );
+				bone.matrixWorld.copy( this.boneInverses[ i ] ).invert();
 
 			}
 
@@ -132,12 +127,12 @@ class Skeleton {
 
 				if ( bone.parent && bone.parent.isBone ) {
 
-					bone.matrix.copy( this._convertToReferenceLocal( bone.parent.matrixWorld ).invert() );
-					bone.matrix.multiply( this._convertToReferenceLocal( bone.matrixWorld ) );
+					bone.matrix.copy( bone.parent.matrixWorld ).invert();
+					bone.matrix.multiply( bone.matrixWorld );
 
 				} else {
 
-					bone.matrix.copy( this._convertToReferenceLocal( bone.matrixWorld ) );
+					bone.matrix.copy( bone.matrixWorld );
 
 				}
 
@@ -150,6 +145,12 @@ class Skeleton {
 	}
 
 	update() {
+		
+		if (this.bones[0].parent) {
+
+			this._setReferenceMatrixWorld( this.bones[0].parent.matrixWorld );
+
+		}
 
 		const bones = this.bones;
 		const boneInverses = this.boneInverses;
