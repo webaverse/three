@@ -9799,9 +9799,9 @@
 
 	var skinning_pars_vertex = "#ifdef USE_SKINNING\n\tuniform mat4 bindMatrix;\n\tuniform mat4 bindMatrixInverse;\n\t#ifdef BONE_TEXTURE\n\t\tuniform highp sampler2D boneTexture;\n\t\tuniform int boneTextureSize;\n\t\tmat4 getBoneMatrix( const in float i ) {\n\t\t\tfloat j = i * 4.0;\n\t\t\tfloat x = mod( j, float( boneTextureSize ) );\n\t\t\tfloat y = floor( j / float( boneTextureSize ) );\n\t\t\tfloat dx = 1.0 / float( boneTextureSize );\n\t\t\tfloat dy = 1.0 / float( boneTextureSize );\n\t\t\ty = dy * ( y + 0.5 );\n\t\t\tvec4 v1 = texture2D( boneTexture, vec2( dx * ( x + 0.5 ), y ) );\n\t\t\tvec4 v2 = texture2D( boneTexture, vec2( dx * ( x + 1.5 ), y ) );\n\t\t\tvec4 v3 = texture2D( boneTexture, vec2( dx * ( x + 2.5 ), y ) );\n\t\t\tvec4 v4 = texture2D( boneTexture, vec2( dx * ( x + 3.5 ), y ) );\n\t\t\tmat4 bone = mat4( v1, v2, v3, v4 );\n\t\t\treturn bone;\n\t\t}\n\t#else\n\t\tuniform mat4 boneMatrices[ MAX_BONES ];\n\t\tmat4 getBoneMatrix( const in float i ) {\n\t\t\tmat4 bone = boneMatrices[ int(i) ];\n\t\t\treturn bone;\n\t\t}\n\t#endif\n#endif";
 
-	var skinning_vertex = "#ifdef USE_SKINNING\n\tvec4 skinVertex = bindMatrix * vec4( transformed, 1.0 );\n\tvec4 skinned = vec4( 0.0 );\n\tskinned += boneMatX * skinVertex * skinWeight.x;\n\tskinned += boneMatY * skinVertex * skinWeight.y;\n\tskinned += boneMatZ * skinVertex * skinWeight.z;\n\tskinned += boneMatW * skinVertex * skinWeight.w;\n\ttransformed = ( bindMatrixInverse * skinned ).xyz;\n#endif";
+	var skinning_vertex = "#ifdef USE_SKINNING\n\tvec4 skinVertex = vec4( transformed, 1.0 );\n\tvec4 skinned = vec4( 0.0 );\n\tskinned += boneMatX * skinVertex * skinWeight.x;\n\tskinned += boneMatY * skinVertex * skinWeight.y;\n\tskinned += boneMatZ * skinVertex * skinWeight.z;\n\tskinned += boneMatW * skinVertex * skinWeight.w;\n\ttransformed = skinned.xyz;\n#endif";
 
-	var skinnormal_vertex = "#ifdef USE_SKINNING\n\tmat4 skinMatrix = mat4( 0.0 );\n\tskinMatrix += skinWeight.x * boneMatX;\n\tskinMatrix += skinWeight.y * boneMatY;\n\tskinMatrix += skinWeight.z * boneMatZ;\n\tskinMatrix += skinWeight.w * boneMatW;\n\tskinMatrix = bindMatrixInverse * skinMatrix * bindMatrix;\n\tobjectNormal = vec4( skinMatrix * vec4( objectNormal, 0.0 ) ).xyz;\n\t#ifdef USE_TANGENT\n\t\tobjectTangent = vec4( skinMatrix * vec4( objectTangent, 0.0 ) ).xyz;\n\t#endif\n#endif";
+	var skinnormal_vertex = "#ifdef USE_SKINNING\n\tmat4 skinMatrix = mat4( 0.0 );\n\tskinMatrix += skinWeight.x * boneMatX;\n\tskinMatrix += skinWeight.y * boneMatY;\n\tskinMatrix += skinWeight.z * boneMatZ;\n\tskinMatrix += skinWeight.w * boneMatW;\n\tobjectNormal = vec4( skinMatrix * vec4( objectNormal, 0.0 ) ).xyz;\n\t#ifdef USE_TANGENT\n\t\tobjectTangent = vec4( skinMatrix * vec4( objectTangent, 0.0 ) ).xyz;\n\t#endif\n#endif";
 
 	var specularmap_fragment = "float specularStrength;\n#ifdef USE_SPECULARMAP\n\tvec4 texelSpecular = texture2D( specularMap, vUv );\n\tspecularStrength = texelSpecular.r;\n#else\n\tspecularStrength = 1.0;\n#endif";
 
@@ -19379,7 +19379,9 @@
 			_isContextLost = true;
 		}
 
-		function onContextRestore() {
+		function
+			/* event */
+		onContextRestore() {
 			console.log('THREE.WebGLRenderer: Context Restored.');
 			_isContextLost = false;
 			const infoAutoReset = info.autoReset;
@@ -21457,8 +21459,17 @@
 			this.boneMatrices = null;
 			this.boneTexture = null;
 			this.boneTextureSize = 0;
+			this.referenceMatrixWorldInverse = new Matrix4();
 			this.frame = -1;
 			this.init();
+		}
+
+		_setReferenceMatrixWorld(matrixWorld) {
+			this.referenceMatrixWorldInverse.copy(matrixWorld).invert();
+		}
+
+		_convertToReferenceLocal(matrix) {
+			return this.referenceMatrixWorldInverse.clone().multiply(matrix);
 		}
 
 		init() {
@@ -21523,6 +21534,10 @@
 		}
 
 		update() {
+			if (this.bones[0]) {
+				this._setReferenceMatrixWorld(this.bones[0].matrixWorld);
+			}
+
 			const bones = this.bones;
 			const boneInverses = this.boneInverses;
 			const boneMatrices = this.boneMatrices;
@@ -21530,7 +21545,11 @@
 
 			for (let i = 0, il = bones.length; i < il; i++) {
 				// compute the offset between the current and the original transform
-				const matrix = bones[i] ? bones[i].matrixWorld : _identityMatrix;
+				const matrix = _identityMatrix;
+
+				if (bones[i]) {
+					matrix.copy(this._convertToReferenceLocal(bones[i].matrixWorld));
+				}
 
 				_offsetMatrix.multiplyMatrices(matrix, boneInverses[i]);
 
@@ -34154,15 +34173,15 @@
 			// TODO: delete this comment?
 			const distanceGeometry = new THREE.IcosahedronBufferGeometry( 1, 2 );
 			const distanceMaterial = new THREE.MeshBasicMaterial( { color: hexColor, fog: false, wireframe: true, opacity: 0.1, transparent: true } );
-			this.lightSphere = new THREE.Mesh( bulbGeometry, bulbMaterial );
+				this.lightSphere = new THREE.Mesh( bulbGeometry, bulbMaterial );
 			this.lightDistance = new THREE.Mesh( distanceGeometry, distanceMaterial );
-			const d = light.distance;
-			if ( d === 0.0 ) {
-				this.lightDistance.visible = false;
-			} else {
-				this.lightDistance.scale.set( d, d, d );
-			}
-			this.add( this.lightDistance );
+				const d = light.distance;
+				if ( d === 0.0 ) {
+					this.lightDistance.visible = false;
+				} else {
+					this.lightDistance.scale.set( d, d, d );
+				}
+				this.add( this.lightDistance );
 			*/
 		}
 
@@ -34179,12 +34198,12 @@
 			}
 			/*
 			const d = this.light.distance;
-				if ( d === 0.0 ) {
-					this.lightDistance.visible = false;
-				} else {
-					this.lightDistance.visible = true;
+					if ( d === 0.0 ) {
+						this.lightDistance.visible = false;
+					} else {
+						this.lightDistance.visible = true;
 				this.lightDistance.scale.set( d, d, d );
-				}
+					}
 			*/
 
 		}
@@ -34583,7 +34602,7 @@
 			1/___0/|
 			| 6__|_7
 			2/___3/
-				0: max.x, max.y, max.z
+					0: max.x, max.y, max.z
 			1: min.x, max.y, max.z
 			2: min.x, min.y, max.z
 			3: max.x, min.y, max.z
@@ -35233,10 +35252,14 @@
 	};
 
 	Loader.Handlers = {
-		add: function () {
+		add: function
+			/* regex, loader */
+		() {
 			console.error('THREE.Loader: Handlers.add() has been removed. Use LoadingManager.addHandler() instead.');
 		},
-		get: function () {
+		get: function
+			/* file */
+		() {
 			console.error('THREE.Loader: Handlers.get() has been removed. Use LoadingManager.getHandler() instead.');
 		}
 	};
@@ -35324,7 +35347,9 @@
 		return vector.applyMatrix3(this);
 	};
 
-	Matrix3.prototype.multiplyVector3Array = function () {
+	Matrix3.prototype.multiplyVector3Array = function
+		/* a */
+	() {
 		console.error('THREE.Matrix3: .multiplyVector3Array() has been removed.');
 	};
 
@@ -35333,7 +35358,9 @@
 		return attribute.applyMatrix3(this);
 	};
 
-	Matrix3.prototype.applyToVector3Array = function () {
+	Matrix3.prototype.applyToVector3Array = function
+		/* array, offset, length */
+	() {
 		console.error('THREE.Matrix3: .applyToVector3Array() has been removed.');
 	};
 
@@ -35377,7 +35404,9 @@
 		return vector.applyMatrix4(this);
 	};
 
-	Matrix4.prototype.multiplyVector3Array = function () {
+	Matrix4.prototype.multiplyVector3Array = function
+		/* a */
+	() {
 		console.error('THREE.Matrix4: .multiplyVector3Array() has been removed.');
 	};
 
@@ -35416,7 +35445,9 @@
 		return attribute.applyMatrix4(this);
 	};
 
-	Matrix4.prototype.applyToVector3Array = function () {
+	Matrix4.prototype.applyToVector3Array = function
+		/* array, offset, length */
+	() {
 		console.error('THREE.Matrix4: .applyToVector3Array() has been removed.');
 	};
 
@@ -35749,7 +35780,9 @@
 				console.warn('THREE.BufferAttribute: .dynamic has been deprecated. Use .usage instead.');
 				return this.usage === DynamicDrawUsage;
 			},
-			set: function () {
+			set: function
+				/* value */
+			() {
 				console.warn('THREE.BufferAttribute: .dynamic has been deprecated. Use .usage instead.');
 				this.setUsage(DynamicDrawUsage);
 			}
@@ -35762,9 +35795,13 @@
 		return this;
 	};
 
-	BufferAttribute.prototype.copyIndicesArray = function () {
+	BufferAttribute.prototype.copyIndicesArray = function
+		/* indices */
+	() {
 		console.error('THREE.BufferAttribute: .copyIndicesArray() has been removed.');
-	}, BufferAttribute.prototype.setArray = function () {
+	}, BufferAttribute.prototype.setArray = function
+		/* array */
+	() {
 		console.error('THREE.BufferAttribute: .setArray has been removed. Use BufferGeometry .setAttribute to replace/resize attribute buffers');
 	}; //
 
@@ -35839,7 +35876,9 @@
 		return this;
 	};
 
-	InterleavedBuffer.prototype.setArray = function () {
+	InterleavedBuffer.prototype.setArray = function
+		/* array */
+	() {
 		console.error('THREE.InterleavedBuffer: .setArray has been removed. Use BufferGeometry .setAttribute to replace/resize attribute buffers');
 	}; //
 
@@ -36073,7 +36112,9 @@
 				console.warn('THREE.WebGLRenderer: .shadowMapCullFace has been removed. Set Material.shadowSide instead.');
 				return undefined;
 			},
-			set: function () {
+			set: function
+				/* value */
+			() {
 				console.warn('THREE.WebGLRenderer: .shadowMapCullFace has been removed. Set Material.shadowSide instead.');
 			}
 		},
@@ -36133,7 +36174,9 @@
 				console.warn('THREE.WebGLRenderer: .shadowMap.cullFace has been removed. Set Material.shadowSide instead.');
 				return undefined;
 			},
-			set: function () {
+			set: function
+				/* cullFace */
+			() {
 				console.warn('THREE.WebGLRenderer: .shadowMap.cullFace has been removed. Set Material.shadowSide instead.');
 			}
 		},
@@ -36328,13 +36371,19 @@
 	} //
 
 	const SceneUtils = {
-		createMultiMaterialObject: function () {
+		createMultiMaterialObject: function
+			/* geometry, materials */
+		() {
 			console.error('THREE.SceneUtils has been moved to /examples/jsm/utils/SceneUtils.js');
 		},
-		detach: function () {
+		detach: function
+			/* child, parent, scene */
+		() {
 			console.error('THREE.SceneUtils has been moved to /examples/jsm/utils/SceneUtils.js');
 		},
-		attach: function () {
+		attach: function
+			/* child, scene, parent */
+		() {
 			console.error('THREE.SceneUtils has been moved to /examples/jsm/utils/SceneUtils.js');
 		}
 	}; //
@@ -36833,3 +36882,4 @@
 	Object.defineProperty(exports, '__esModule', { value: true });
 
 }));
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoidGhyZWUuanMiLCJzb3VyY2VzIjpbXSwic291cmNlc0NvbnRlbnQiOltdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiIn0=

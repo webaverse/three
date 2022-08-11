@@ -23,9 +23,23 @@ class Skeleton {
 		this.boneTexture = null;
 		this.boneTextureSize = 0;
 
+		this.referenceMatrixWorldInverse = new Matrix4();
+
 		this.frame = - 1;
 
 		this.init();
+
+	}
+
+	_setReferenceMatrixWorld( matrixWorld ) {
+
+		this.referenceMatrixWorldInverse.copy( matrixWorld ).invert();
+
+	}
+
+	_convertToReferenceLocal( matrix ) {
+
+		return this.referenceMatrixWorldInverse.clone().multiply( matrix );
 
 	}
 
@@ -60,6 +74,11 @@ class Skeleton {
 
 			}
 
+		}
+
+		this.root = bones[0];
+		if ( this.root.name === "Hips" && this.root.parent ) {
+			this.root = this.root.parent;
 		}
 
 	}
@@ -128,6 +147,12 @@ class Skeleton {
 	}
 
 	update() {
+		
+		if (this.root) {
+
+			this._setReferenceMatrixWorld( this.root.matrixWorld );
+
+		}
 
 		const bones = this.bones;
 		const boneInverses = this.boneInverses;
@@ -140,7 +165,13 @@ class Skeleton {
 
 			// compute the offset between the current and the original transform
 
-			const matrix = bones[ i ] ? bones[ i ].matrixWorld : _identityMatrix;
+			const matrix = _identityMatrix;
+			
+			if ( bones[i] ) {
+
+				matrix.copy( this._convertToReferenceLocal( bones[ i ].matrixWorld ) );
+
+			}
 
 			_offsetMatrix.multiplyMatrices( matrix, boneInverses[ i ] );
 			_offsetMatrix.toArray( boneMatrices, i * 16 );
