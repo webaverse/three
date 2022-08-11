@@ -115,12 +115,6 @@ class SkinnedMesh extends Mesh {
 
 	}
 
-	applySkeletonTransform() {
-		
-		this.matrixWorld.copy( this.skeleton.referenceMatrixWorld );
-
-	}
-
 	boneTransform( index, target ) {
 
 		const skeleton = this.skeleton;
