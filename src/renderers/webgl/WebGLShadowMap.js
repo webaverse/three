@@ -28,7 +28,7 @@ function WebGLShadowMap( _renderer, _objects, _capabilities ) {
 
 		_maxTextureSize = _capabilities.maxTextureSize;
 
-	_depthMaterial.freeze();
+	//_depthMaterial.freeze();
 	_distanceMaterial.freeze();
 
 	const shadowSide = { 0: BackSide, 1: FrontSide, 2: DoubleSide };
