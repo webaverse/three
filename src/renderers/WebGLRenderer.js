@@ -1450,6 +1450,8 @@ function WebGLRenderer( parameters = {} ) {
 
 		} else {
 
+			// console.log('newcachekey', parameters, programCacheKey, material, material.uuid, scene, scene.uuid, object, object.uuid);
+
 			parameters.uniforms = programCache.getUniforms( material );
 
 			material.onBuild( object, parameters, _this );

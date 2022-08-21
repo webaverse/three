@@ -113,6 +113,8 @@ class Material extends EventDispatcher {
 
 	freeze(freezeFn = parameters => {
 		// this implementation ensures that the typical vertex shader parameters are keyed in the cache
+		// use this only when you're sure the shaders are only dependent on material parameters,
+		// and not with mesh properties / renderer environments.
 		return [
 			'freeze',
 			this.uuid,

@@ -6739,6 +6739,8 @@
 
 		freeze(freezeFn = parameters => {
 			// this implementation ensures that the typical vertex shader parameters are keyed in the cache
+			// use this only when you're sure the shaders are only dependent on material parameters,
+			// and not with mesh properties / renderer environments.
 			return ['freeze', this.uuid, parameters.maxBones, parameters.morphTargetsCount].join(',');
 		}) {
 			this.programCacheKey = freezeFn;
@@ -15517,10 +15519,9 @@
 			fog: false
 		}),
 					_materialCache = {},
-					_maxTextureSize = _capabilities.maxTextureSize; //_depthMaterial.freeze();
+					_maxTextureSize = _capabilities.maxTextureSize; // _depthMaterial.freeze();
+		// _distanceMaterial.freeze();
 
-
-		_distanceMaterial.freeze();
 
 		const shadowSide = {
 			0: BackSide,
@@ -20522,6 +20523,7 @@
 					return program;
 				}
 			} else {
+				// console.log('newcachekey', parameters, programCacheKey, material, material.uuid, scene, scene.uuid, object, object.uuid);
 				parameters.uniforms = programCache.getUniforms(material);
 				material.onBuild(object, parameters, _this);
 				material.onBeforeCompile(parameters, _this);

@@ -8754,6 +8754,8 @@ class Material extends EventDispatcher {
 
 	freeze(freezeFn = parameters => {
 		// this implementation ensures that the typical vertex shader parameters are keyed in the cache
+		// use this only when you're sure the shaders are only dependent on material parameters,
+		// and not with mesh properties / renderer environments.
 		return [
 			'freeze',
 			this.uuid,
@@ -20806,8 +20808,8 @@ function WebGLShadowMap( _renderer, _objects, _capabilities ) {
 
 		_maxTextureSize = _capabilities.maxTextureSize;
 
-	//_depthMaterial.freeze();
-	_distanceMaterial.freeze();
+	// _depthMaterial.freeze();
+	// _distanceMaterial.freeze();
 
 	const shadowSide = { 0: BackSide, 1: FrontSide, 2: DoubleSide };
 
@@ -28125,6 +28127,8 @@ function WebGLRenderer( parameters = {} ) {
 			}
 
 		} else {
+
+			// console.log('newcachekey', parameters, programCacheKey, material, material.uuid, scene, scene.uuid, object, object.uuid);
 
 			parameters.uniforms = programCache.getUniforms( material );
 
