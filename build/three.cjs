@@ -15515,11 +15515,9 @@ function WebGLShadowMap(_renderer, _objects, _capabilities) {
 		fog: false
 	}),
 				_materialCache = {},
-				_maxTextureSize = _capabilities.maxTextureSize;
+				_maxTextureSize = _capabilities.maxTextureSize; // _depthMaterial.freeze();
+	// _distanceMaterial.freeze();
 
-	_depthMaterial.freeze();
-
-	_distanceMaterial.freeze();
 
 	const shadowSide = {
 		0: BackSide,
