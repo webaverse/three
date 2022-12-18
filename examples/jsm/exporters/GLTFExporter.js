@@ -470,6 +470,45 @@ class GLTFWriter {
 		options = writer.options;
 		const extensionsUsed = writer.extensionsUsed;
 
+		if (options.vrm && options.gltfObject) {
+			json.extensions = structuredClone(input.userData.gltfExtensions);
+
+			const vrmExtension = json.extensions.VRM;
+			const humanBones = vrmExtension?.humanoid?.humanBones;
+		  
+			const gltf = options.gltfObject;
+			const originalNodeNames = (() => {
+				const result = {};
+				for (const sanitizedName in gltf.parser.nodeNamesUsed) {
+					const originalName = gltf.parser.nodeNamesUsed[sanitizedName];
+					result[originalName] = sanitizedName;
+				}
+				return result;
+			})();
+
+			for (const humanBone of humanBones) {
+				const {bone, node, useDefaultValues} = humanBone;
+				const boneSpec = gltf.parser.json.nodes[node];
+				const sanitizedName = boneSpec.name;
+				const originalName = originalNodeNames[sanitizedName];
+
+				// get the new node index and set it as humanBone.node
+				const newNodeIndex = json.nodes.findIndex(node => {
+					return node.name === originalName;
+				});
+				// if (newNodeIndex === -1) {
+				// 	console.log('could not find 2', originalName, gltf.parser.nodeNamesUsed);
+				// 	debugger;
+				// }
+				const newNode = json.nodes[newNodeIndex];
+				newNode.name = sanitizedName;
+
+				const old = humanBone.node;
+				humanBone.node = newNodeIndex;
+			}
+
+		}
+
 		// Merge buffers.
 		const blob = new Blob( buffers, { type: 'application/octet-stream' } );
 
