@@ -3464,13 +3464,13 @@ class GLTFParser {
 
 		let name = sanitizedName;
 
-		for ( let i = 1; this.nodeNamesUsed[ name ]; ++ i ) {
+		for ( let i = 1; this.nodeNamesUsed[ name ] !== undefined; ++ i ) {
 
 			name = sanitizedName + '_' + i;
 
 		}
 
-		this.nodeNamesUsed[ name ] = true;
+		this.nodeNamesUsed[ name ] = originalName;
 
 		return name;
 
