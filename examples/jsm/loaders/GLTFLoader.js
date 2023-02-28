@@ -2386,6 +2386,8 @@ class GLTFParser {
 
 		// loader object cache
 		this.cache = new GLTFRegistry();
+		this.cacheSync = new GLTFRegistry();
+		this.nodes = [];
 
 		// associations between Three.js objects and glTF elements
 		this.associations = new Map();
@@ -2469,6 +2471,8 @@ class GLTFParser {
 
 		} ) ).then( function () {
 
+			parser.nodes = [];
+
 			return Promise.all( [
 
 				parser.getDependencies( 'scene' ),
@@ -2478,6 +2482,8 @@ class GLTFParser {
 			] );
 
 		} ).then( function ( dependencies ) {
+
+			parser.cacheSync.add('node', parser.nodes);
 
 			const result = {
 				scene: dependencies[ 0 ][ json.scene || 0 ],
@@ -4093,6 +4099,8 @@ class GLTFParser {
 			}
 
 			parser.associations.get( node ).nodes = nodeIndex;
+
+			parser.nodes.push(node);
 
 			return node;
 
