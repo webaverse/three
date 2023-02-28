@@ -2483,6 +2483,17 @@ class GLTFParser {
 
 		} ).then( function ( dependencies ) {
 
+			const sortedNodes = [];
+			parser.json.nodes.forEach(node => {
+				for( let i = 0; i < parser.nodes.length; i++ ) {
+					const object3D = parser.nodes[i];
+					if (object3D.userData.name === node.name) {
+						sortedNodes.push(object3D);
+						break;
+					}
+				}
+			})
+			parser.nodes = sortedNodes;
 			parser.cacheSync.add('node', parser.nodes);
 
 			const result = {
