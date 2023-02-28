@@ -2376,6 +2376,7 @@ function getImageURIMimeType( uri ) {
 /* GLTF PARSER */
 
 class GLTFParser {
+	#nodes = null;
 
 	constructor( json = {}, options = {} ) {
 
@@ -2386,6 +2387,8 @@ class GLTFParser {
 
 		// loader object cache
 		this.cache = new GLTFRegistry();
+		this.cacheSync = new GLTFRegistry();
+		this.#nodes = [];
 
 		// associations between Three.js objects and glTF elements
 		this.associations = new Map();
@@ -2469,6 +2472,8 @@ class GLTFParser {
 
 		} ) ).then( function () {
 
+			parser.#nodes = [];
+
 			return Promise.all( [
 
 				parser.getDependencies( 'scene' ),
@@ -2478,6 +2483,19 @@ class GLTFParser {
 			] );
 
 		} ).then( function ( dependencies ) {
+
+			const sortedNodes = [];
+			parser.json.nodes.forEach(node => {
+				for( let i = 0; i < parser.#nodes.length; i++ ) {
+					const object3D = parser.#nodes[i];
+					if (object3D.userData.name === node.name) {
+						sortedNodes.push(object3D);
+						break;
+					}
+				}
+			})
+			parser.#nodes = sortedNodes;
+			parser.cacheSync.add('node', parser.#nodes);
 
 			const result = {
 				scene: dependencies[ 0 ][ json.scene || 0 ],
@@ -4093,6 +4111,8 @@ class GLTFParser {
 			}
 
 			parser.associations.get( node ).nodes = nodeIndex;
+
+			parser.#nodes.push(node);
 
 			return node;
 
